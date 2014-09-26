@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-configuration PUBLIC "-//Hibernate/Hibernate Configuration DTD 3.0//EN" "http://hibernate.sourceforge.net/hibernate-configuration-3.0.dtd">
+<hibernate-configuration>
+  <session-factory>
+    <property name="hibernate.dialect">org.hibernate.dialect.DerbyDialect</property>
+    
+    <!-- Embedded Driver -->
+    <!-- <property name="connection.driver_class">org.apache.derby.jdbc.EmbeddedDriver</property>
+    <property name="connection.url">jdbc:derby:musicplayerdb;create=true</property>
+    -->
+    <!-- Client Driver -->
+        <property name="hibernate.connection.driver_class">org.apache.derby.jdbc.ClientDriver</property>
+    <property name="hibernate.connection.url">jdbc:derby://localhost:1527/musicplayerdb</property>
+    <property name="hibernate.connection.username">preet</property>
+    <property name="hibernate.connection.password">preet</property>
+    
+    
+    
+     <!-- JDBC connection pool (use the built-in) -->
+        <property name="connection.pool_size">1</property>
+    
+     <!-- Disable the second-level cache  -->
+        <property name="cache.provider_class">org.hibernate.cache.NoCacheProvider</property>
+
+        <!-- Echo all executed SQL to stdout -->
+        <property name="show_sql">true</property>
+
+        <!-- Drop and re-create the database schema on startup -->
+        <property name="hbm2ddl.auto">create</property>
+
+        <!-- Names the annotated entity class -->
+        <mapping class="org.musicplayer.model.Song"/>
+    
+    
+  </session-factory>
+  
+  
+  
+</hibernate-configuration>
