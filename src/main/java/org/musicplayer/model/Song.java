@@ -19,8 +19,59 @@ public class Song {
     @GeneratedValue
     private int songId;
     private String title;
-    private String singer;
+    private String artist;
+    private String album;
+    private String length;
+    private String genre;
+    
+    private byte[] song;
 
+    public byte[] getSong() {
+        return song;
+    }
+
+    public void setSong(byte[] song) {
+        this.song = song;
+    }
+    
+    
+
+    public String getArtist() {
+        return artist;
+    }
+
+    public void setArtist(String artist) {
+        this.artist = artist;
+    }
+
+    public String getAlbum() {
+        return album;
+    }
+
+    public void setAlbum(String album) {
+        this.album = album;
+    }
+
+    public String getLength() {
+        return length;
+    }
+
+    public void setLength(String length) {
+        this.length = length;
+    }
+
+   
+
+    public String getGenre() {
+        return genre;
+    }
+
+    public void setGenre(String genre) {
+        this.genre = genre;
+    }
+    
+
+    
     public int getSongId() {
         return songId;
     }
@@ -38,12 +89,4 @@ public class Song {
         this.title = title;
     }
 
-    public String getSinger() {
-        return singer;
-    }
-
-    public void setSinger(String singer) {
-        this.singer = singer;
-    }
-    
 }

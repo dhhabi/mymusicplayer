@@ -3,12 +3,15 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.mycompany.mymusicplayer;
+package org.mymusicplayer;
 
+import java.util.List;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
+import org.musicplayer.dao.SongsLibraryDao;
 import org.musicplayer.model.Song;
+import org.musicplayer.ui.PlayerUI;
 
 /**
  *
@@ -17,16 +20,21 @@ import org.musicplayer.model.Song;
 public class MusicPlayer {
     
     public static void main(String[] args){
-       Song song = new Song();
-        song.setSinger("Preet");
+    /*    Song song = new Song();
         song.setTitle("Ranjhana");
-        
-        
-        SessionFactory sessionFactory = new Configuration().configure().buildSessionFactory();
+        SessionFactory sessionFactory = HibernateUtil.getSessionFactory();
         Session session = sessionFactory.openSession();
         session.beginTransaction();
-        session.save(song);
+        System.out.println(session.save(song));
         session.getTransaction().commit();
-        System.out.print("saved");
+        System.out.println("saved");
+        
+        SongsLibraryDao sl = new SongsLibraryDao();
+        List<Song> songs = sl.getAllSongs();
+        for(Song s : songs){
+            System.out.println(s.getTitle());
+        }  */
+        
+        new PlayerUI().setVisible(true);
     }
 }
