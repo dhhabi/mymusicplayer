@@ -33,9 +33,7 @@ public class SongLibraryService {
             fis = new FileInputStream(songFile);
             byte[] songData = IOUtils.toByteArray(fis,fis.available());
             song.setSong(songData);
-            song.setTitle(songFile.getName());
-            
-            
+            song.setTitle(songFile.getName());            
         } catch (FileNotFoundException ex) {
             JOptionPane.showMessageDialog(null, ex.toString());
         } catch (IOException ex) {
@@ -45,8 +43,11 @@ public class SongLibraryService {
     }
     
     public List getAllSongs(){
-        
         return songLibrary.getAllSongs();
+    }
+    
+    public int addSong(Song song){
+        return songLibrary.addSong(song);
     }
     
 }

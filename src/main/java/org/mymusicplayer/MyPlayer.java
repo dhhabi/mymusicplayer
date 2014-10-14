@@ -6,9 +6,7 @@
 package org.mymusicplayer;
 
 import java.io.BufferedInputStream;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.ByteArrayInputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javazoom.jl.decoder.JavaLayerException;
@@ -21,8 +19,8 @@ import org.musicplayer.ui.PlayerUI;
  */
 public class MyPlayer {
     
-    private FileInputStream fis;
     private BufferedInputStream bis;
+    private ByteArrayInputStream bais;
     
     public Player player;
     
@@ -31,6 +29,20 @@ public class MyPlayer {
     public String songLocation;
     private boolean playing;
     private boolean stoped;
+    
+    private byte[] nowPlayingSongBytes;
+
+    public byte[] getNowPlayingSongBytes() {
+        return nowPlayingSongBytes;
+    }
+
+    public void setNowPlayingSongBytes(byte[] nowPlayingSongBytes) {
+        this.nowPlayingSongBytes = nowPlayingSongBytes;
+    }
+
+    
+
+    
     
     /**
      * Method to stop currently playing song 
@@ -45,76 +57,31 @@ public class MyPlayer {
         }
     }
     
-    /**
-     * Method to play the song 
-     * @param path path to the music file 
-     */
-    public void play(String path){
-        
-        if(!playing){
-        try {
-            fis = new FileInputStream(path);
-            bis = new BufferedInputStream(fis);
-            player = new Player(bis);
-            songTotalLength = fis.available();
-            songLocation = path+"";
-            playing=true;
-            stoped=false;
-        } catch (FileNotFoundException | JavaLayerException ex) {
-            Logger.getLogger(MyPlayer.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
-            Logger.getLogger(MyPlayer.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        
-        new Thread(){
-            @Override
-            public void run( ){
-                try {
-                    player.play();
-                    
-                    // To add the loop
-                    if(PlayerUI.loop == 1 && player.isComplete())
-                        play(songLocation);
-                    
-                } catch (JavaLayerException ex) {
-                    Logger.getLogger(MyPlayer.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }
-        }.start();
-        }
-    }
-    
-     public void pause(){
+    public void pause(){
         if(player != null){
-            try {
-                pauseLocation = fis.available();
-                playing = false;
-                player.close();
-            } catch (IOException ex) {
-                Logger.getLogger(MyPlayer.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            pauseLocation = bais.available();
+            playing = false;
+            player.close();
         }
     }
      
      
      public void resume(){
         if(stoped){
-            play(songLocation);
+            play(nowPlayingSongBytes);
         }else if(!playing){
          try {
-            fis = new FileInputStream(songLocation);
-            bis = new BufferedInputStream(fis);
+            bais = new ByteArrayInputStream(nowPlayingSongBytes);
+            bis = new BufferedInputStream(bais);
            
             player = new Player(bis);
-            fis.skip(songTotalLength - pauseLocation);
+            bais.skip(songTotalLength - pauseLocation);
             //fis.skip(songTotalLength - pauseLocation); 
             // songTotalLength = fis.available();
             playing = true;
             stoped=false;
             
-        } catch (FileNotFoundException | JavaLayerException ex) {
-            Logger.getLogger(MyPlayer.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
+        } catch (JavaLayerException ex) {
             Logger.getLogger(MyPlayer.class.getName()).log(Level.SEVERE, null, ex);
         }         
         new Thread(){
@@ -129,5 +96,44 @@ public class MyPlayer {
         }.start();
         }
     }
+     
+     
+     // Player functions using input stream 
+     
+     public void play(byte[] songBytes){
+        
+        if(!playing){
+        try {
+            //fis = new FileInputStream(path);
+            nowPlayingSongBytes = songBytes;
+            bais = new ByteArrayInputStream(songBytes);
+            bis = new BufferedInputStream(bais);
+            player = new Player(bis);
+            songTotalLength = bais.available();
+            //songLocation = path+"";
+            playing=true;
+            stoped=false;
+        } catch (JavaLayerException ex) {
+            Logger.getLogger(MyPlayer.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        new Thread(){
+            @Override
+            public void run( ){
+                try {
+                    player.play();
+                    
+                    // To add the loop
+                    if(PlayerUI.loop == 1 && player.isComplete())
+                        play(nowPlayingSongBytes);
+                    
+                } catch (JavaLayerException ex) {
+                    Logger.getLogger(MyPlayer.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }.start();
+        }
+    }
+     
     
 }
