@@ -492,7 +492,8 @@ public class PlayerUI extends javax.swing.JFrame {
       tableLibrary.setModel(model);
           
       colmn = tableLibrary.getColumnModel().getColumn(0);
-      colmn.setPreferredWidth(10);
+      colmn.setMinWidth(0);
+      colmn.setMaxWidth(0);
       colmn = tableLibrary.getColumnModel().getColumn(1);
       colmn.setPreferredWidth(150);
       colmn = tableLibrary.getColumnModel().getColumn(6);
