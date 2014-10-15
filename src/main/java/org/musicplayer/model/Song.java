@@ -5,16 +5,19 @@
  */
 package org.musicplayer.model;
 
+import java.io.Serializable;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.Lob;
 
 /**
  *
  * @author preet
  */
 @Entity
-public class Song {
+public class Song implements Serializable {
     @Id
     @GeneratedValue
     private int songId;
@@ -24,6 +27,8 @@ public class Song {
     private String length;
     private String genre;
     
+    @Lob
+    @Column(length = 10485760)
     private byte[] song;
 
     public byte[] getSong() {
