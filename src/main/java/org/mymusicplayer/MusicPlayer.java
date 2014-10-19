@@ -35,6 +35,6 @@ public class MusicPlayer {
             System.out.println(s.getTitle());
         }  */
         
-        new PlayerUI().setVisible(true);
+        new PlayerUI(true).setVisible(true);
     }
 }
