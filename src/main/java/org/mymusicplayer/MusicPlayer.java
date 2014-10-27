@@ -11,6 +11,7 @@ import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
 import org.musicplayer.dao.SongsLibraryDao;
 import org.musicplayer.model.Song;
+import org.musicplayer.ui.CorePlayerUI;
 import org.musicplayer.ui.PlayerUI;
 
 /**
@@ -36,5 +37,8 @@ public class MusicPlayer {
         }  */
         
         new PlayerUI(true).setVisible(true);
+        
+        new PlayerUI(false).setVisible(true);
+        //new CorePlayerUI().setVisible(true);
     }
 }
