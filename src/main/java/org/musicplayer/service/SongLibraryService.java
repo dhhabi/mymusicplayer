@@ -13,14 +13,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.sql.Blob;
-import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JOptionPane;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.time.DateUtils;
 import org.apache.commons.lang.time.DurationFormatUtils;
 import org.musicplayer.dao.SongsLibraryDao;
 import org.musicplayer.model.Song;
@@ -48,7 +46,7 @@ public class SongLibraryService {
             song.setArtist(tags.getArtist());
             song.setGenre(tags.getGenreDescription());
             String songLength = DurationFormatUtils.formatDurationHMS(mp3File.getLengthInMilliseconds());
-            song.setLength(songLength);
+            song.setSongLength(songLength);
             
         } catch (FileNotFoundException ex) {
             JOptionPane.showMessageDialog(null, ex.toString());
@@ -57,6 +55,7 @@ public class SongLibraryService {
         } catch (UnsupportedTagException | InvalidDataException ex) {
             Logger.getLogger(SongLibraryService.class.getName()).log(Level.SEVERE, null, ex);
         }
+        
         return songLibrary.addSong(song);
     }
     
@@ -75,5 +74,8 @@ public class SongLibraryService {
     public int deleteSong(int songId){
         return songLibrary.deleteSong(songId);
     }
+    
+    
+   
     
 }

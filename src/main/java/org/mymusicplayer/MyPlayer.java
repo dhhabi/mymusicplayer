@@ -31,7 +31,8 @@ public class MyPlayer {
     private boolean stoped;
     
     private byte[] nowPlayingSongBytes;
-
+    
+    
     public byte[] getNowPlayingSongBytes() {
         return nowPlayingSongBytes;
     }
@@ -54,6 +55,7 @@ public class MyPlayer {
             playing = false;
             stoped = true;
             player.close();
+           
         }
     }
     
@@ -134,6 +136,5 @@ public class MyPlayer {
         }.start();
         }
     }
-     
     
 }

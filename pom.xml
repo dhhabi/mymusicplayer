@@ -150,6 +150,20 @@
             <version>1.9.5-1</version>
         </dependency>
         
+        <dependency>
+            <groupId>com.googlecode.soundlibs</groupId>
+            <artifactId>tritonus-share</artifactId>
+            <version>0.3.7-1</version>
+        </dependency>
+
+<!--        <dependency>
+            <groupId>com.googlecode.soundlibs</groupId>
+            <artifactId>jlayer</artifactId>
+            <version>1.0.1-1</version>
+        </dependency>-->
+
+        
+        
         <!-- Commons IO -->
         <dependency>
             <groupId>commons-io</groupId>
@@ -164,7 +178,18 @@
             <version>2.3</version>
         </dependency>
 
+        <!-- Local jars-->
+        <dependency>
+            <groupId>basic-player</groupId>
+            <artifactId>basic-player</artifactId>
+            <version>3.0</version>
+        </dependency>
 
-
+        <dependency>
+            <groupId>jl-one</groupId>
+            <artifactId>jl-one</artifactId>
+            <version>1.0</version>
+        </dependency>
+        
     </dependencies>
 </project>

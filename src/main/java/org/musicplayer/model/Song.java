@@ -24,9 +24,38 @@ public class Song implements Serializable {
     private String title;
     private String artist;
     private String album;
-    private String length;
+    private String songLength;
     private String genre;
+    private String songYear;
+    private String comments;
+
+    public String getSongLength() {
+        return songLength;
+    }
+
+    public void setSongLength(String songLength) {
+        this.songLength = songLength;
+    }
+
+    public String getSongYear() {
+        return songYear;
+    }
+
+    public void setSongYear(String songYear) {
+        this.songYear = songYear;
+    }
+
     
+    
+    
+    public String getComments() {
+        return comments;
+    }
+
+    public void setComments(String comments) {
+        this.comments = comments;
+    }
+       
     @Lob
     @Column(length = 10485760)
     private byte[] song;
@@ -55,14 +84,6 @@ public class Song implements Serializable {
 
     public void setAlbum(String album) {
         this.album = album;
-    }
-
-    public String getLength() {
-        return length;
-    }
-
-    public void setLength(String length) {
-        this.length = length;
     }
 
    

@@ -5,8 +5,8 @@
  */
 package org.musicplayer.dao;
 
+import java.util.ArrayList;
 import java.util.List;
-import javax.swing.JOptionPane;
 import org.hibernate.Query;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -37,11 +37,21 @@ public class SongsLibraryDao {
         return songId;
     }
     
+    
+    public void addMultipleSongs(ArrayList<Song> songList){
+        Session session = sessionFactory.getCurrentSession();
+        session.beginTransaction();
+        for(Song song:songList){
+            session.save(song);
+        }
+        session.getTransaction().commit();
+    }
+    
     public List getAllSongs(){
         
         Session session = sessionFactory.getCurrentSession();
         session.beginTransaction();
-        Query query = session.createQuery("select songId, title, artist, album, length, genre from Song");
+        Query query = session.createQuery("select songId, title, artist, album, songLength, genre, songYear, comments from Song");
         List<Object[]> songList = (List<Object[]>)query.list();
         session.getTransaction().commit();
         return songList;
