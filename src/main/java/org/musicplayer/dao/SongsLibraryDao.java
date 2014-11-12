@@ -45,13 +45,14 @@ public class SongsLibraryDao {
             session.save(song);
         }
         session.getTransaction().commit();
+        
     }
     
     public List getAllSongs(){
         
         Session session = sessionFactory.getCurrentSession();
         session.beginTransaction();
-        Query query = session.createQuery("select songId, title, artist, album, songLength, genre, songYear, comments from Song");
+        Query query = session.createQuery("select songId, title, artist, album, songLength, genre, songYear, comments, songPath from Song");
         List<Object[]> songList = (List<Object[]>)query.list();
         session.getTransaction().commit();
         return songList;
@@ -73,4 +74,29 @@ public class SongsLibraryDao {
         session.getTransaction().commit();
         return updatedRows;
     }
+    
+    public boolean isAlreadyExist(String songPath){
+        Session session = sessionFactory.getCurrentSession();
+        session.beginTransaction();
+        Query query = session.createQuery("select songPath from Song where SONGPATH='"+songPath+"'");
+        List<Object[]> allPlaylist = (List<Object[]>)query.list();
+        boolean items = allPlaylist.isEmpty();
+        session.getTransaction().commit();
+        return !items;
+     }
+    
+    
+    public int getSongUsingFilePath(String songPath){
+        Session session = sessionFactory.getCurrentSession();
+        session.beginTransaction();
+        Query query = session.createQuery("select songId from Song where SONGPATH='"+songPath+"'");
+        List<Object> allPlaylist = query.list();
+        session.getTransaction().commit();
+        int songId=0;
+        for (Object Id : allPlaylist) {
+            songId = (int)Id;
+        }
+        return songId;
+     }
+    
 }

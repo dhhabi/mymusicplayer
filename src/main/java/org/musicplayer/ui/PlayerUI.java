@@ -9,7 +9,9 @@ import com.mpatric.mp3agic.ID3v1;
 import com.mpatric.mp3agic.InvalidDataException;
 import com.mpatric.mp3agic.Mp3File;
 import com.mpatric.mp3agic.UnsupportedTagException;
+import java.awt.Color;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
@@ -29,16 +31,21 @@ import java.util.logging.Logger;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.JTable;
+import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeCellRenderer;
+import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreePath;
 import javazoom.jlgui.basicplayer.BasicPlayer;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.time.DurationFormatUtils;
+import org.musicplayer.dao.PlayListDao;
 import org.musicplayer.dao.SongsLibraryDao;
+import org.musicplayer.model.Playlist;
 import org.musicplayer.model.Song;
-import org.musicplayer.service.SongLibraryService;
-import org.mymusicplayer.MyPlayer;
 import org.mymusicplayer.MyPlayerV1;
 
 /**
@@ -51,7 +58,7 @@ public class PlayerUI extends javax.swing.JFrame {
      * Creates new form Player
      */
     private boolean playListFlag;
-   // public static MyPlayer myPlayer = new MyPlayer();
+    // public static MyPlayer myPlayer = new MyPlayer();
     public static MyPlayerV1 myPlayerV1 = new MyPlayerV1();
     public static int loop;
     private final DefaultTableModel model = new DefaultTableModel(new String[]{"Id", "Title", "Artist", "Album", "Length", "Genre", "songPath", "Year", "Comments"}, 0);
@@ -61,13 +68,26 @@ public class PlayerUI extends javax.swing.JFrame {
     public static BasicPlayer musicPlayer = new BasicPlayer();
     //private SongsLibraryDao songLibrary = new SongsLibraryDao();
     // private SongLibraryService libraryService = new SongLibraryService();
-    private SongsLibraryDao songsLibraryDao = new SongsLibraryDao();
+    private final SongsLibraryDao songsLibraryDao;
+    private final PlayListDao playlistDao;
+    private final DefaultTreeModel treeModel;
+    private String currentShowingPlaylist;
+    private final String playListPassed;
 
-    public PlayerUI(boolean flag) {
+    private static DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode("Playlist");
+
+    public PlayerUI(boolean flag, String playListName) {
         initComponents();
+        this.playlistDao = new PlayListDao();
+        this.songsLibraryDao = new SongsLibraryDao();
+        this.treeModel = new DefaultTreeModel(rootNode);
+        this.playListPassed = playListName;
+
+        initPlayListTree();
+        treePlayList.setModel(treeModel);
         //custome
         this.playListFlag = flag;
-        
+
         this.addWindowListener(new WindowListener() {
 
             @Override
@@ -110,9 +130,12 @@ public class PlayerUI extends javax.swing.JFrame {
         }
 
         initTable();
-        initSongLibrary();
-
-        //setLayout(new GridLayout(2,2));
+        if (playListPassed.equals("library")) {
+            initSongLibrary();
+        } else {
+            this.setTitle(playListPassed);
+            showPlaylist(playlistDao.getPlaylsit(playListPassed));
+        }//setLayout(new GridLayout(2,2));
         //initDragDrop();
     }
 
@@ -128,6 +151,9 @@ public class PlayerUI extends javax.swing.JFrame {
         tablePopupMenu = new javax.swing.JPopupMenu();
         menuItemAddToLibrary = new javax.swing.JMenuItem();
         menuItemDeleteFromLibrary = new javax.swing.JMenuItem();
+        popUpPlaylistTree = new javax.swing.JPopupMenu();
+        menuItemOpenInNewWindow = new javax.swing.JMenuItem();
+        menuItemDeletePlaylist = new javax.swing.JMenuItem();
         lblNowPlaying = new javax.swing.JLabel();
         jLabel1 = new javax.swing.JLabel();
         cmdPlay = new javax.swing.JButton();
@@ -149,8 +175,8 @@ public class PlayerUI extends javax.swing.JFrame {
         menuItemOpen = new javax.swing.JMenuItem();
         menuItemAddSong = new javax.swing.JMenuItem();
         jMenuItem2 = new javax.swing.JMenuItem();
+        miCreatePlaylist = new javax.swing.JMenuItem();
         jMenuItem1 = new javax.swing.JMenuItem();
-        jMenuItem3 = new javax.swing.JMenuItem();
 
         menuItemAddToLibrary.setText("Add to Library");
         menuItemAddToLibrary.addActionListener(new java.awt.event.ActionListener() {
@@ -167,6 +193,22 @@ public class PlayerUI extends javax.swing.JFrame {
             }
         });
         tablePopupMenu.add(menuItemDeleteFromLibrary);
+
+        menuItemOpenInNewWindow.setText("Open in new Window");
+        menuItemOpenInNewWindow.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                menuItemOpenInNewWindowActionPerformed(evt);
+            }
+        });
+        popUpPlaylistTree.add(menuItemOpenInNewWindow);
+
+        menuItemDeletePlaylist.setText("Delete Playlist");
+        menuItemDeletePlaylist.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                menuItemDeletePlaylistActionPerformed(evt);
+            }
+        });
+        popUpPlaylistTree.add(menuItemDeletePlaylist);
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("Music Player");
@@ -220,6 +262,16 @@ public class PlayerUI extends javax.swing.JFrame {
         treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("two");
         treeNode1.add(treeNode2);
         treePlayList.setModel(new javax.swing.tree.DefaultTreeModel(treeNode1));
+        treePlayList.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                treePlayListMouseClicked(evt);
+            }
+        });
+        treePlayList.addTreeSelectionListener(new javax.swing.event.TreeSelectionListener() {
+            public void valueChanged(javax.swing.event.TreeSelectionEvent evt) {
+                treePlayListValueChanged(evt);
+            }
+        });
         jScrollPane2.setViewportView(treePlayList);
 
         treeNode1 = new javax.swing.tree.DefaultMutableTreeNode("Library");
@@ -323,6 +375,14 @@ public class PlayerUI extends javax.swing.JFrame {
         });
         menuItemExit.add(jMenuItem2);
 
+        miCreatePlaylist.setText("Create Playlist");
+        miCreatePlaylist.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                miCreatePlaylistActionPerformed(evt);
+            }
+        });
+        menuItemExit.add(miCreatePlaylist);
+
         jMenuItem1.setText("Exit");
         jMenuItem1.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -330,9 +390,6 @@ public class PlayerUI extends javax.swing.JFrame {
             }
         });
         menuItemExit.add(jMenuItem1);
-
-        jMenuItem3.setText("Create Playlist");
-        menuItemExit.add(jMenuItem3);
 
         jMenuBar1.add(menuItemExit);
 
@@ -403,22 +460,21 @@ public class PlayerUI extends javax.swing.JFrame {
 
         //myPlayer.stop();
         myPlayerV1.stopPlaying();
-        
+
     }//GEN-LAST:event_cmdStopActionPerformed
 
     private void cmdPlayActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmdPlayActionPerformed
-        
+
         //myPlayer.resume();
-        if(paused){
+        if (paused) {
             myPlayerV1.resumePlaying();
             paused = false;
-        }
-        else{
+        } else {
             Song song = songsLibraryDao.getSong((int) tableLibrary.getValueAt(selectedRow, 0));
             myPlayerV1.stopPlaying();
             myPlayerV1.playSong(song.getSong());
-        } 
-       
+        }
+
     }//GEN-LAST:event_cmdPlayActionPerformed
 
     private void cmdPauseActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmdPauseActionPerformed
@@ -522,7 +578,7 @@ public class PlayerUI extends javax.swing.JFrame {
             selectedRow = rowCount;
             handleTableDoubleClick((int) tableLibrary.getValueAt(selectedRow, 0));
         }
-        
+
         tableLibrary.setRowSelectionInterval(selectedRow, selectedRow);
     }//GEN-LAST:event_cmdPreviousActionPerformed
 
@@ -543,7 +599,7 @@ public class PlayerUI extends javax.swing.JFrame {
                 JOptionPane.showMessageDialog(rootPane, "Song deleted successfully");
             }
         }
-        
+
     }//GEN-LAST:event_jMenuItem2ActionPerformed
 
     private void jTree1ValueChanged(javax.swing.event.TreeSelectionEvent evt) {//GEN-FIRST:event_jTree1ValueChanged
@@ -553,16 +609,97 @@ public class PlayerUI extends javax.swing.JFrame {
     private void jTree1MouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jTree1MouseClicked
         clearTable(tableLibrary);
         initSongLibrary();
+        currentShowingPlaylist = "library";
     }//GEN-LAST:event_jTree1MouseClicked
 
     private void jSlider1StateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_jSlider1StateChanged
-        myPlayerV1.adjustVolume((float)jSlider1.getValue());
+        myPlayerV1.adjustVolume((float) jSlider1.getValue());
     }//GEN-LAST:event_jSlider1StateChanged
 
     private void jSlider1CaretPositionChanged(java.awt.event.InputMethodEvent evt) {//GEN-FIRST:event_jSlider1CaretPositionChanged
         jSlider1.getValue();
-        
+
     }//GEN-LAST:event_jSlider1CaretPositionChanged
+
+    private void miCreatePlaylistActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miCreatePlaylistActionPerformed
+        String playListName = JOptionPane.showInputDialog("Input Playlist name");
+
+        if (playlistDao.isAlreadyExist(playListName)) {
+            JOptionPane.showMessageDialog(rootPane, "Already Exist");
+        } else {
+            Playlist newPlaylist = new Playlist(playListName);
+            playlistDao.createNewPlaylist(newPlaylist);
+            DefaultMutableTreeNode newChildNode = new DefaultMutableTreeNode(playListName);
+            //DefaultMutableTreeNode root = (DefaultMutableTreeNode) treePlayList.getModel().getRoot();
+            rootNode.add(newChildNode);
+
+            TreePath pathToChild = new TreePath(newChildNode);
+            treePlayList.setSelectionPath(pathToChild);
+            DefaultTreeCellRenderer renderer
+                    = (DefaultTreeCellRenderer) treePlayList.getCellRenderer();
+            renderer.setTextSelectionColor(Color.white);
+            renderer.setBackgroundSelectionColor(Color.blue);
+            renderer.setBorderSelectionColor(Color.black);
+
+            ((DefaultTreeModel) (treePlayList.getModel())).reload();
+
+            clearTable(tableLibrary);
+            currentShowingPlaylist = playListName;
+
+            int row = treePlayList.getRowForPath(pathToChild);
+            treePlayList.setSelectionRow(row);
+        }
+    }//GEN-LAST:event_miCreatePlaylistActionPerformed
+
+    private void treePlayListValueChanged(javax.swing.event.TreeSelectionEvent evt) {//GEN-FIRST:event_treePlayListValueChanged
+
+    }//GEN-LAST:event_treePlayListValueChanged
+
+    private void treePlayListMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_treePlayListMouseClicked
+        //JTree tree = (JTree) evt.getSource();
+        if (SwingUtilities.isRightMouseButton(evt)) {
+            TreePath path = treePlayList.getPathForLocation(evt.getX(), evt.getY());
+
+            Rectangle pathBounds = treePlayList.getUI().getPathBounds(treePlayList, path);
+            if (pathBounds != null && pathBounds.contains(evt.getX(), evt.getY())) {
+                popUpPlaylistTree.show(treePlayList, pathBounds.x, pathBounds.y + pathBounds.height);
+            }
+
+            int row = treePlayList.getClosestRowForLocation(evt.getX(), evt.getY());
+            treePlayList.setSelectionRow(row);
+            DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePlayList.getLastSelectedPathComponent();
+
+            Object nodeInfo = node.getUserObject();
+            String selectedNode = (String) nodeInfo;
+            currentShowingPlaylist = selectedNode;
+
+        } else if (SwingUtilities.isLeftMouseButton(evt)) {
+            DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePlayList.getLastSelectedPathComponent();
+
+            Object nodeInfo = node.getUserObject();
+            String selectedNode = (String) nodeInfo;
+            currentShowingPlaylist = selectedNode;
+            if (!selectedNode.equals("Playlist")) {
+                Playlist playList = playlistDao.getPlaylsit(currentShowingPlaylist);
+                showPlaylist(playList);
+            }
+
+        }
+    }//GEN-LAST:event_treePlayListMouseClicked
+
+    private void menuItemOpenInNewWindowActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_menuItemOpenInNewWindowActionPerformed
+        new PlayerUI(true, currentShowingPlaylist).setVisible(true);
+    }//GEN-LAST:event_menuItemOpenInNewWindowActionPerformed
+
+    private void menuItemDeletePlaylistActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_menuItemDeletePlaylistActionPerformed
+        deleteSelectedNode();
+        int i = playlistDao.deletePlaylist(currentShowingPlaylist);
+        if(i>0){
+            clearTable(tableLibrary);
+            initSongLibrary();
+            JOptionPane.showMessageDialog(rootPane, "Playlist deleted successfully !");
+        }
+    }//GEN-LAST:event_menuItemDeletePlaylistActionPerformed
 
     /**
      * @param args the command line arguments
@@ -595,7 +732,7 @@ public class PlayerUI extends javax.swing.JFrame {
         /* Create and display the form */
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
-                new PlayerUI(false).setVisible(true);
+                new PlayerUI(false, "").setVisible(true);
             }
         });
     }
@@ -611,7 +748,6 @@ public class PlayerUI extends javax.swing.JFrame {
     private javax.swing.JMenuBar jMenuBar1;
     private javax.swing.JMenuItem jMenuItem1;
     private javax.swing.JMenuItem jMenuItem2;
-    private javax.swing.JMenuItem jMenuItem3;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JSlider jSlider1;
@@ -621,8 +757,12 @@ public class PlayerUI extends javax.swing.JFrame {
     private javax.swing.JMenuItem menuItemAddSong;
     private javax.swing.JMenuItem menuItemAddToLibrary;
     private javax.swing.JMenuItem menuItemDeleteFromLibrary;
+    private javax.swing.JMenuItem menuItemDeletePlaylist;
     private javax.swing.JMenu menuItemExit;
     private javax.swing.JMenuItem menuItemOpen;
+    private javax.swing.JMenuItem menuItemOpenInNewWindow;
+    private javax.swing.JMenuItem miCreatePlaylist;
+    private javax.swing.JPopupMenu popUpPlaylistTree;
     private javax.swing.JTable tableLibrary;
     private javax.swing.JPopupMenu tablePopupMenu;
     private javax.swing.JScrollPane tableScorllPan;
@@ -634,7 +774,7 @@ public class PlayerUI extends javax.swing.JFrame {
         List<Object[]> songs = songsLibraryDao.getAllSongs();
         for (Object[] song : songs) {
             //{songId,title,artist,album,length,genre,filePath,year,comment};
-            Object[] rowdata = {song[0], song[1], song[2], song[3], song[4], song[5], "", song[6], song[7]};
+            Object[] rowdata = {song[0], song[1], song[2], song[3], song[4], song[5], song[7], song[6], song[7]};
             model.addRow(rowdata);
         }
 
@@ -664,20 +804,37 @@ public class PlayerUI extends javax.swing.JFrame {
             song.setGenre(tags.getGenreDescription());
             song.setSongYear(tags.getYear());
             song.setComments(tags.getComment());
+            song.setSongPath(filePath);
             song.setSongLength(DurationFormatUtils.formatDurationHMS(mp3File.getLengthInMilliseconds()));
             //int songId = songsLibraryDao.addSong(song);  
-            addRowToLibraryTable(0, tags.getTitle(), tags.getArtist(), tags.getAlbum(), String.valueOf(mp3File.getLength()), String.valueOf(tags.getGenreDescription()), filePath, tags.getYear(), tags.getComment());
             //new thread to save song in the library 
             //String songPath= (String)tableLibrary.getValueAt(selectedRow, 6);
-            Thread t = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    int songId = songsLibraryDao.addSong(song);
-                    //JOptionPane.showMessageDialog(rootPane, "Saved " + songId);
+            if (songsLibraryDao.isAlreadyExist(filePath)) {
+                int songId = songsLibraryDao.getSongUsingFilePath(filePath);
+                
+                if (playListFlag || !currentShowingPlaylist.equals("library")) {
+                    addRowToLibraryTable(0, tags.getTitle(), tags.getArtist(), tags.getAlbum(), String.valueOf(mp3File.getLength()), String.valueOf(tags.getGenreDescription()), filePath, tags.getYear(), tags.getComment());
+                    playlistDao.addSongToPlaylist(currentShowingPlaylist, songId);
+                } else {
+                    JOptionPane.showMessageDialog(rootPane, "Song Already exist "+filePath);
                 }
-            });
-            t.start();
-            t.join();
+            } else {
+                addRowToLibraryTable(0, tags.getTitle(), tags.getArtist(), tags.getAlbum(), String.valueOf(mp3File.getLength()), String.valueOf(tags.getGenreDescription()), filePath, tags.getYear(), tags.getComment());
+
+                Thread t = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+
+                        int songId = songsLibraryDao.addSong(song);
+                        if (playListFlag || !currentShowingPlaylist.equals("library")) {
+                            playlistDao.addSongToPlaylist(currentShowingPlaylist, songId);
+                        }
+                        //JOptionPane.showMessageDialog(rootPane, "Saved " + songId);
+                    }
+                });
+                t.start();
+                t.join();
+            }
 
             // end of thread to save song to database
             // tableLibrary.setRowSelectionInterval(tableLibrary.getRowCount()-1, tableLibrary.getRowCount()-1);
@@ -685,7 +842,6 @@ public class PlayerUI extends javax.swing.JFrame {
             Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        
     }
 
     private void clearTable(JTable table) {
@@ -760,17 +916,17 @@ public class PlayerUI extends javax.swing.JFrame {
 
             File firstSongFile = (File) fileList.get(0);
 
-            try ( //Play mp3 file here
-                    FileInputStream fis = new FileInputStream(firstSongFile)) {
+          /*  try ( //Play mp3 file here
+               FileInputStream fis = new FileInputStream(firstSongFile)) {
                 myPlayerV1.stopPlaying();
                 myPlayerV1.playSong(IOUtils.toByteArray(fis));
 
                 fis.close();
                 //super.drop(dtde);
-            }
+            }*/
         } catch (UnsupportedFlavorException | IOException ex) {
             Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        } 
 
     }
 
@@ -832,5 +988,35 @@ public class PlayerUI extends javax.swing.JFrame {
             //addSongToLibrary();
         }
     }
+
+    private void initPlayListTree() {
+
+        List<String> listOfPlaylist = playlistDao.getAllPlaylistNames();
+        for (String playlistName : listOfPlaylist) {
+            DefaultMutableTreeNode playlistNameNode = new DefaultMutableTreeNode(playlistName);
+            rootNode.add(playlistNameNode);
+        }
+        ((DefaultTreeModel) (treePlayList.getModel())).reload();
+    }
+
+    private void showPlaylist(Playlist playList) {
+
+        ArrayList<Integer> songList = playList.getSongList();
+        clearTable(tableLibrary);
+        for (int i : songList) {
+            Song song = songsLibraryDao.getSong(i);
+            addRowToLibraryTable(song.getSongId(), song.getTitle(), song.getArtist(), song.getAlbum(), song.getSongLength(), song.getGenre(), "", song.getSongYear(), song.getComments());
+        }
+    }
+    
+    private void deleteSelectedNode() {
+    DefaultMutableTreeNode node;
+    DefaultTreeModel myModel = (DefaultTreeModel) (treePlayList.getModel());
+    TreePath[] paths = treePlayList.getSelectionPaths();
+        for (TreePath path : paths) {
+            node = (DefaultMutableTreeNode) (path.getLastPathComponent());
+            myModel.removeNodeFromParent(node);
+        }
+  }
 
 }

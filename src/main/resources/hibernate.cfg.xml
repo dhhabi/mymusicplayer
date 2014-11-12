@@ -34,7 +34,7 @@
         
         <!-- Names the annotated entity class -->
         <mapping class="org.musicplayer.model.Song"/>
-    
+        <mapping class="org.musicplayer.model.Playlist"/>
     
   </session-factory>
   

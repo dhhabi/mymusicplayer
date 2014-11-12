@@ -28,7 +28,16 @@ public class Song implements Serializable {
     private String genre;
     private String songYear;
     private String comments;
+    private String songPath;
 
+    public String getSongPath() {
+        return songPath;
+    }
+
+    public void setSongPath(String songPath) {
+        this.songPath = songPath;
+    }
+    
     public String getSongLength() {
         return songLength;
     }
