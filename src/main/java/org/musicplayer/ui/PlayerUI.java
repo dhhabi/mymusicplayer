@@ -18,6 +18,8 @@ import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.dnd.DnDConstants;
 import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetDropEvent;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.io.File;
@@ -29,9 +31,14 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.JFileChooser;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.JProgressBar;
+import javax.swing.JSlider;
 import javax.swing.JTable;
 import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
+import javax.swing.Timer;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
@@ -46,6 +53,7 @@ import org.musicplayer.dao.PlayListDao;
 import org.musicplayer.dao.SongsLibraryDao;
 import org.musicplayer.model.Playlist;
 import org.musicplayer.model.Song;
+import org.mymusicplayer.MusicPlayerV2;
 import org.mymusicplayer.MyPlayerV1;
 
 /**
@@ -59,11 +67,12 @@ public class PlayerUI extends javax.swing.JFrame {
      */
     private boolean playListFlag;
     // public static MyPlayer myPlayer = new MyPlayer();
-    public static MyPlayerV1 myPlayerV1 = new MyPlayerV1();
+    //public static MyPlayerV1 myPlayerV1 = new MyPlayerV1();
+    public static MusicPlayerV2 myPlayerV2 = new MusicPlayerV2();
     public static int loop;
-    private final DefaultTableModel model = new DefaultTableModel(new String[]{"Id", "Title", "Artist", "Album", "Length", "Genre", "songPath", "Year", "Comments"}, 0);
+    private final DefaultTableModel model = new DefaultTableModel(new String[]{"Id", "Title", "Artist", "Album", "Length", "Genre", "File Path", "Year", "Comments"}, 0);
     private TableColumn colmn;
-    private static int selectedRow = 0;
+    private int selectedRow = 0;
     private static boolean paused = false;
     public static BasicPlayer musicPlayer = new BasicPlayer();
     //private SongsLibraryDao songLibrary = new SongsLibraryDao();
@@ -73,11 +82,22 @@ public class PlayerUI extends javax.swing.JFrame {
     private final DefaultTreeModel treeModel;
     private String currentShowingPlaylist;
     private final String playListPassed;
+    private int currentSongIndex;
+    private boolean shuffle = false;
+    private boolean repeat = false;
 
     private static DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode("Playlist");
 
+    public static Timer timer = null;
+    public static int timeCount = 0;
+    public static JProgressBar progressBar;
+    private UpdateWorker updateWorker = new UpdateWorker();
+
     public PlayerUI(boolean flag, String playListName) {
         initComponents();
+        PlayerUI.progressBar = jProgressBar;
+        treePlayList.setSelectionRow(0);
+        this.currentShowingPlaylist = playListName;
         this.playlistDao = new PlayListDao();
         this.songsLibraryDao = new SongsLibraryDao();
         this.treeModel = new DefaultTreeModel(rootNode);
@@ -93,7 +113,7 @@ public class PlayerUI extends javax.swing.JFrame {
             @Override
             public void windowClosing(WindowEvent e) {
                 if (playListFlag) {
-                    setDefaultCloseOperation(HIDE_ON_CLOSE);
+                    setDefaultCloseOperation(DISPOSE_ON_CLOSE);
                 } else {
                     setDefaultCloseOperation(EXIT_ON_CLOSE);
                 }
@@ -151,6 +171,7 @@ public class PlayerUI extends javax.swing.JFrame {
         tablePopupMenu = new javax.swing.JPopupMenu();
         menuItemAddToLibrary = new javax.swing.JMenuItem();
         menuItemDeleteFromLibrary = new javax.swing.JMenuItem();
+        menuAddToPlaylist = new javax.swing.JMenu();
         popUpPlaylistTree = new javax.swing.JPopupMenu();
         menuItemOpenInNewWindow = new javax.swing.JMenuItem();
         menuItemDeletePlaylist = new javax.swing.JMenuItem();
@@ -168,8 +189,11 @@ public class PlayerUI extends javax.swing.JFrame {
         jTree1 = new javax.swing.JTree();
         tableScorllPan = new javax.swing.JScrollPane();
         tableLibrary = new javax.swing.JTable();
-        jSlider1 = new javax.swing.JSlider();
+        volumeSlider = new javax.swing.JSlider();
         jLabel2 = new javax.swing.JLabel();
+        jProgressBar = new javax.swing.JProgressBar();
+        lblStartTimer = new javax.swing.JLabel();
+        lblEndTimer = new javax.swing.JLabel();
         jMenuBar1 = new javax.swing.JMenuBar();
         menuItemExit = new javax.swing.JMenu();
         menuItemOpen = new javax.swing.JMenuItem();
@@ -177,6 +201,17 @@ public class PlayerUI extends javax.swing.JFrame {
         jMenuItem2 = new javax.swing.JMenuItem();
         miCreatePlaylist = new javax.swing.JMenuItem();
         jMenuItem1 = new javax.swing.JMenuItem();
+        jMenu1 = new javax.swing.JMenu();
+        miPlay = new javax.swing.JMenuItem();
+        miNext = new javax.swing.JMenuItem();
+        miPrevious = new javax.swing.JMenuItem();
+        jMenu2 = new javax.swing.JMenu();
+        jMenuItem3 = new javax.swing.JMenuItem();
+        jSeparator1 = new javax.swing.JPopupMenu.Separator();
+        miIncreaseVolume = new javax.swing.JMenuItem();
+        miDecreaseVolume = new javax.swing.JMenuItem();
+        miShuffle = new javax.swing.JCheckBoxMenuItem();
+        miRepeat = new javax.swing.JCheckBoxMenuItem();
 
         menuItemAddToLibrary.setText("Add to Library");
         menuItemAddToLibrary.addActionListener(new java.awt.event.ActionListener() {
@@ -193,6 +228,14 @@ public class PlayerUI extends javax.swing.JFrame {
             }
         });
         tablePopupMenu.add(menuItemDeleteFromLibrary);
+
+        menuAddToPlaylist.setText("Add to Playlist");
+        menuAddToPlaylist.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                menuAddToPlaylistMouseEntered(evt);
+            }
+        });
+        tablePopupMenu.add(menuAddToPlaylist);
 
         menuItemOpenInNewWindow.setText("Open in new Window");
         menuItemOpenInNewWindow.addActionListener(new java.awt.event.ActionListener() {
@@ -262,6 +305,7 @@ public class PlayerUI extends javax.swing.JFrame {
         treeNode2 = new javax.swing.tree.DefaultMutableTreeNode("two");
         treeNode1.add(treeNode2);
         treePlayList.setModel(new javax.swing.tree.DefaultTreeModel(treeNode1));
+        treePlayList.setFocusable(false);
         treePlayList.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
                 treePlayListMouseClicked(evt);
@@ -276,6 +320,7 @@ public class PlayerUI extends javax.swing.JFrame {
 
         treeNode1 = new javax.swing.tree.DefaultMutableTreeNode("Library");
         jTree1.setModel(new javax.swing.tree.DefaultTreeModel(treeNode1));
+        jTree1.setFocusable(false);
         jTree1.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent evt) {
                 jTree1MouseClicked(evt);
@@ -319,6 +364,8 @@ public class PlayerUI extends javax.swing.JFrame {
             }
         ));
         tableLibrary.setComponentPopupMenu(tablePopupMenu);
+        tableLibrary.setFocusable(false);
+        tableLibrary.setShowVerticalLines(false);
         tableLibrary.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mousePressed(java.awt.event.MouseEvent evt) {
                 tableLibraryMousePressed(evt);
@@ -329,25 +376,28 @@ public class PlayerUI extends javax.swing.JFrame {
         });
         tableScorllPan.setViewportView(tableLibrary);
 
-        jSlider1.setMajorTickSpacing(20);
-        jSlider1.setMaximum(6);
-        jSlider1.setMinimum(-80);
-        jSlider1.setMinorTickSpacing(5);
-        jSlider1.setPaintTicks(true);
-        jSlider1.addChangeListener(new javax.swing.event.ChangeListener() {
+        volumeSlider.setMajorTickSpacing(20);
+        volumeSlider.setMinorTickSpacing(1);
+        volumeSlider.setPaintTicks(true);
+        volumeSlider.setToolTipText("");
+        volumeSlider.addChangeListener(new javax.swing.event.ChangeListener() {
             public void stateChanged(javax.swing.event.ChangeEvent evt) {
-                jSlider1StateChanged(evt);
+                volumeSliderStateChanged(evt);
             }
         });
-        jSlider1.addInputMethodListener(new java.awt.event.InputMethodListener() {
+        volumeSlider.addInputMethodListener(new java.awt.event.InputMethodListener() {
             public void inputMethodTextChanged(java.awt.event.InputMethodEvent evt) {
             }
             public void caretPositionChanged(java.awt.event.InputMethodEvent evt) {
-                jSlider1CaretPositionChanged(evt);
+                volumeSliderCaretPositionChanged(evt);
             }
         });
 
         jLabel2.setText("Vol.");
+
+        lblStartTimer.setText("00:00 :00");
+
+        lblEndTimer.setText("00:00:00");
 
         menuItemExit.setText("File");
 
@@ -393,6 +443,88 @@ public class PlayerUI extends javax.swing.JFrame {
 
         jMenuBar1.add(menuItemExit);
 
+        jMenu1.setText("Controls");
+
+        miPlay.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_SPACE, 0));
+        miPlay.setText("Play");
+        miPlay.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                miPlayActionPerformed(evt);
+            }
+        });
+        jMenu1.add(miPlay);
+
+        miNext.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_RIGHT, java.awt.event.InputEvent.CTRL_MASK));
+        miNext.setText("Next");
+        miNext.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                miNextActionPerformed(evt);
+            }
+        });
+        jMenu1.add(miNext);
+
+        miPrevious.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_LEFT, java.awt.event.InputEvent.CTRL_MASK));
+        miPrevious.setText("Previous");
+        miPrevious.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                miPreviousActionPerformed(evt);
+            }
+        });
+        jMenu1.add(miPrevious);
+
+        jMenu2.setText("Play Recent");
+        jMenu1.add(jMenu2);
+
+        jMenuItem3.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L, java.awt.event.InputEvent.CTRL_MASK));
+        jMenuItem3.setText("Go to  Current Song");
+        jMenuItem3.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jMenuItem3ActionPerformed(evt);
+            }
+        });
+        jMenu1.add(jMenuItem3);
+
+        jSeparator1.setForeground(new java.awt.Color(68, 61, 61));
+        jMenu1.add(jSeparator1);
+
+        miIncreaseVolume.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_I, java.awt.event.InputEvent.CTRL_MASK));
+        miIncreaseVolume.setText("Increase Volume");
+        miIncreaseVolume.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                miIncreaseVolumeActionPerformed(evt);
+            }
+        });
+        jMenu1.add(miIncreaseVolume);
+
+        miDecreaseVolume.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_D, java.awt.event.InputEvent.CTRL_MASK));
+        miDecreaseVolume.setText("Decrease Volume");
+        miDecreaseVolume.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                miDecreaseVolumeActionPerformed(evt);
+            }
+        });
+        jMenu1.add(miDecreaseVolume);
+
+        miShuffle.setSelected(true);
+        miShuffle.setText("Shuffle");
+        miShuffle.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                miShuffleActionPerformed(evt);
+            }
+        });
+        jMenu1.add(miShuffle);
+
+        miRepeat.setSelected(true);
+        miRepeat.setText("Repeat");
+        miRepeat.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                miRepeatActionPerformed(evt);
+            }
+        });
+        jMenu1.add(miRepeat);
+
+        jMenuBar1.add(jMenu1);
+
         setJMenuBar(jMenuBar1);
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
@@ -406,12 +538,7 @@ public class PlayerUI extends javax.swing.JFrame {
             .addGroup(layout.createSequentialGroup()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
-                        .addContainerGap()
-                        .addComponent(jLabel1)
-                        .addGap(5, 5, 5)
-                        .addComponent(lblNowPlaying, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                    .addGroup(layout.createSequentialGroup()
-                        .addGap(201, 201, 201)
+                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                         .addComponent(cmdStop, javax.swing.GroupLayout.PREFERRED_SIZE, 70, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(cmdPrevious)
@@ -421,22 +548,41 @@ public class PlayerUI extends javax.swing.JFrame {
                         .addComponent(cmdNext)
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addComponent(cmdPause, javax.swing.GroupLayout.PREFERRED_SIZE, 84, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(0, 0, Short.MAX_VALUE)))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
-                .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 33, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(18, 18, 18)
-                .addComponent(jSlider1, javax.swing.GroupLayout.PREFERRED_SIZE, 218, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap())
+                        .addGap(137, 137, 137)
+                        .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 33, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(18, 18, 18))
+                    .addGroup(layout.createSequentialGroup()
+                        .addContainerGap()
+                        .addComponent(jLabel1)
+                        .addGap(5, 5, 5)
+                        .addComponent(lblNowPlaying, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addGap(83, 83, 83)))
+                .addComponent(volumeSlider, javax.swing.GroupLayout.PREFERRED_SIZE, 218, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(23, 23, 23))
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
+                .addGap(0, 0, Short.MAX_VALUE)
+                .addComponent(lblStartTimer)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jProgressBar, javax.swing.GroupLayout.PREFERRED_SIZE, 455, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(lblEndTimer)
+                .addGap(153, 153, 153))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(layout.createSequentialGroup()
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(mainPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(tableScorllPan, javax.swing.GroupLayout.PREFERRED_SIZE, 469, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(layout.createSequentialGroup()
+                        .addComponent(tableScorllPan, javax.swing.GroupLayout.PREFERRED_SIZE, 469, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                            .addComponent(jProgressBar, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(lblStartTimer)
+                            .addComponent(lblEndTimer, javax.swing.GroupLayout.Alignment.LEADING))))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addGroup(layout.createSequentialGroup()
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(lblNowPlaying)
                             .addComponent(jLabel1))
@@ -447,10 +593,9 @@ public class PlayerUI extends javax.swing.JFrame {
                             .addComponent(cmdPause)
                             .addComponent(cmdPrevious)
                             .addComponent(cmdNext)))
-                    .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                        .addComponent(jLabel2, javax.swing.GroupLayout.PREFERRED_SIZE, 26, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addComponent(jSlider1, javax.swing.GroupLayout.PREFERRED_SIZE, 43, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addGap(25, 25, 25))
+                    .addComponent(jLabel2, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 26, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(volumeSlider, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 43, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap())
         );
 
         pack();
@@ -459,28 +604,37 @@ public class PlayerUI extends javax.swing.JFrame {
     private void cmdStopActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmdStopActionPerformed
 
         //myPlayer.stop();
-        myPlayerV1.stopPlaying();
+        myPlayerV2.stop();
 
     }//GEN-LAST:event_cmdStopActionPerformed
 
     private void cmdPlayActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmdPlayActionPerformed
-
         //myPlayer.resume();
         if (paused) {
-            myPlayerV1.resumePlaying();
+            myPlayerV2.resume();
             paused = false;
         } else {
-            Song song = songsLibraryDao.getSong((int) tableLibrary.getValueAt(selectedRow, 0));
-            myPlayerV1.stopPlaying();
-            myPlayerV1.playSong(song.getSong());
+            myPlayerV2.stop();
+            myPlayerV2.play((String) tableLibrary.getValueAt(selectedRow, 6));
+            currentSongIndex = selectedRow;
+            jProgressBar.setMinimum(0);
+            int duration = Integer.parseInt((String)tableLibrary.getValueAt(selectedRow, 4))/1000;
+            jProgressBar.setMaximum(duration);
+            jProgressBar.setValue(0);
+            
+            updateWorker.done();
+            updateWorker = new UpdateWorker(duration);
+            updateWorker.execute();
+            
         }
-
     }//GEN-LAST:event_cmdPlayActionPerformed
 
     private void cmdPauseActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmdPauseActionPerformed
+
+        myPlayerV2.pause();
         //myPlayer.pause();
         paused = true;
-        myPlayerV1.pausePlaying();
+        //myPlayerV1.pausePlaying();
     }//GEN-LAST:event_cmdPauseActionPerformed
 
     private void tableLibraryMousePressed(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tableLibraryMousePressed
@@ -492,6 +646,7 @@ public class PlayerUI extends javax.swing.JFrame {
         if (evt.getClickCount() == 2) {
             //Handle double click event
             handleTableDoubleClick(selectedSongId);
+            currentSongIndex = selectedRow;
 
         }
     }//GEN-LAST:event_tableLibraryMousePressed
@@ -513,20 +668,14 @@ public class PlayerUI extends javax.swing.JFrame {
         fileChooser.addChoosableFileFilter(fileFilter);
         int returnVal = fileChooser.showOpenDialog(null);
         if (returnVal == JFileChooser.APPROVE_OPTION) {
-            myPlayerV1.stopPlaying();
+            myPlayerV2.stop();
             File songFile = fileChooser.getSelectedFile();
+            //FileInputStream fis;
+            //fis = new FileInputStream(songFile);
+            myPlayerV2.play(songFile.getAbsolutePath());
+            lblNowPlaying.setText(songFile.getName());
+            //  fis.close();
 
-            FileInputStream fis;
-            try {
-                fis = new FileInputStream(songFile);
-                myPlayerV1.playSong(IOUtils.toByteArray(fis));
-                lblNowPlaying.setText(songFile.getName());
-                fis.close();
-            } catch (FileNotFoundException ex) {
-                Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (IOException ex) {
-                Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
     }//GEN-LAST:event_menuItemOpenActionPerformed
 
@@ -555,31 +704,11 @@ public class PlayerUI extends javax.swing.JFrame {
     }//GEN-LAST:event_menuItemDeleteFromLibraryActionPerformed
 
     private void cmdNextActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmdNextActionPerformed
-        int rowCount = tableLibrary.getRowCount() - 1;
-
-        if (selectedRow < rowCount) {
-            ++selectedRow;
-            handleTableDoubleClick((int) tableLibrary.getValueAt(selectedRow, 0));
-        } else {
-            selectedRow = 0;
-            handleTableDoubleClick((int) tableLibrary.getValueAt(selectedRow, 0));
-        }
-        tableLibrary.setRowSelectionInterval(selectedRow, selectedRow);
+       playNext();
     }//GEN-LAST:event_cmdNextActionPerformed
 
     private void cmdPreviousActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmdPreviousActionPerformed
-        int rowCount = tableLibrary.getRowCount() - 1;
-
-        if (selectedRow > 0) {
-            --selectedRow;
-            handleTableDoubleClick((int) tableLibrary.getValueAt(selectedRow, 0));
-
-        } else {
-            selectedRow = rowCount;
-            handleTableDoubleClick((int) tableLibrary.getValueAt(selectedRow, 0));
-        }
-
-        tableLibrary.setRowSelectionInterval(selectedRow, selectedRow);
+        playPrevious();
     }//GEN-LAST:event_cmdPreviousActionPerformed
 
     private void menuItemAddSongActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_menuItemAddSongActionPerformed
@@ -612,14 +741,14 @@ public class PlayerUI extends javax.swing.JFrame {
         currentShowingPlaylist = "library";
     }//GEN-LAST:event_jTree1MouseClicked
 
-    private void jSlider1StateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_jSlider1StateChanged
-        myPlayerV1.adjustVolume((float) jSlider1.getValue());
-    }//GEN-LAST:event_jSlider1StateChanged
+    private void volumeSliderStateChanged(javax.swing.event.ChangeEvent evt) {//GEN-FIRST:event_volumeSliderStateChanged
+        //volumeSlider.getValue();
+        myPlayerV2.setVolume((double) volumeSlider.getValue() / 100.00);
+    }//GEN-LAST:event_volumeSliderStateChanged
 
-    private void jSlider1CaretPositionChanged(java.awt.event.InputMethodEvent evt) {//GEN-FIRST:event_jSlider1CaretPositionChanged
-        jSlider1.getValue();
+    private void volumeSliderCaretPositionChanged(java.awt.event.InputMethodEvent evt) {//GEN-FIRST:event_volumeSliderCaretPositionChanged
 
-    }//GEN-LAST:event_jSlider1CaretPositionChanged
+    }//GEN-LAST:event_volumeSliderCaretPositionChanged
 
     private void miCreatePlaylistActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miCreatePlaylistActionPerformed
         String playListName = JOptionPane.showInputDialog("Input Playlist name");
@@ -689,17 +818,76 @@ public class PlayerUI extends javax.swing.JFrame {
 
     private void menuItemOpenInNewWindowActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_menuItemOpenInNewWindowActionPerformed
         new PlayerUI(true, currentShowingPlaylist).setVisible(true);
+        clearTable(tableLibrary);
+        initSongLibrary();
     }//GEN-LAST:event_menuItemOpenInNewWindowActionPerformed
 
     private void menuItemDeletePlaylistActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_menuItemDeletePlaylistActionPerformed
         deleteSelectedNode();
         int i = playlistDao.deletePlaylist(currentShowingPlaylist);
-        if(i>0){
+        if (i > 0) {
             clearTable(tableLibrary);
             initSongLibrary();
             JOptionPane.showMessageDialog(rootPane, "Playlist deleted successfully !");
         }
     }//GEN-LAST:event_menuItemDeletePlaylistActionPerformed
+
+    private void menuAddToPlaylistMouseEntered(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_menuAddToPlaylistMouseEntered
+        menuAddToPlaylist.removeAll();
+        List<String> listOfPlaylist = playlistDao.getAllPlaylistNames();
+        for (final String playlistName : listOfPlaylist) {
+            JMenuItem menuItem = new JMenuItem(playlistName);
+            menuAddToPlaylist.add(menuItem);
+            menuItem.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    playlistDao.addSongToPlaylist(playlistName, (int) tableLibrary.getValueAt(selectedRow, 0));
+                }
+            });
+        }
+    }//GEN-LAST:event_menuAddToPlaylistMouseEntered
+
+    private void miPlayActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miPlayActionPerformed
+        //JOptionPane.showMessageDialog(rootPane, selectedRow);
+        myPlayerV2.play((String) tableLibrary.getValueAt(selectedRow, 6));
+        tableLibrary.setRowSelectionInterval(selectedRow, selectedRow);
+    }//GEN-LAST:event_miPlayActionPerformed
+
+    private void miNextActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miNextActionPerformed
+        playNext();
+    }//GEN-LAST:event_miNextActionPerformed
+
+    private void miPreviousActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miPreviousActionPerformed
+        playPrevious();
+    }//GEN-LAST:event_miPreviousActionPerformed
+
+    private void jMenuItem3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem3ActionPerformed
+        tableLibrary.setRowSelectionInterval(currentSongIndex, currentSongIndex);
+    }//GEN-LAST:event_jMenuItem3ActionPerformed
+
+    private void miIncreaseVolumeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miIncreaseVolumeActionPerformed
+        if(volumeSlider.getValue()<80)
+            volumeSlider.getModel().setValue(volumeSlider.getValue() + 20);
+        else
+            volumeSlider.getModel().setValue(100);
+        //JOptionPane.showMessageDialog(rootPane, volumeSlider.getValue());
+        //volumeSlider.repaint();
+    }//GEN-LAST:event_miIncreaseVolumeActionPerformed
+
+    private void miDecreaseVolumeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miDecreaseVolumeActionPerformed
+        if(volumeSlider.getValue()>20)
+            volumeSlider.getModel().setValue(volumeSlider.getValue() - 20);
+        else
+            volumeSlider.getModel().setValue(0);
+    }//GEN-LAST:event_miDecreaseVolumeActionPerformed
+
+    private void miShuffleActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miShuffleActionPerformed
+       shuffle = miShuffle.isSelected();
+    }//GEN-LAST:event_miShuffleActionPerformed
+
+    private void miRepeatActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miRepeatActionPerformed
+        repeat = miRepeat.isSelected();
+    }//GEN-LAST:event_miRepeatActionPerformed
 
     /**
      * @param args the command line arguments
@@ -745,15 +933,22 @@ public class PlayerUI extends javax.swing.JFrame {
     private javax.swing.JButton cmdStop;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
+    private javax.swing.JMenu jMenu1;
+    private javax.swing.JMenu jMenu2;
     private javax.swing.JMenuBar jMenuBar1;
     private javax.swing.JMenuItem jMenuItem1;
     private javax.swing.JMenuItem jMenuItem2;
+    private javax.swing.JMenuItem jMenuItem3;
+    private javax.swing.JProgressBar jProgressBar;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
-    private javax.swing.JSlider jSlider1;
+    private javax.swing.JPopupMenu.Separator jSeparator1;
     private javax.swing.JTree jTree1;
+    private javax.swing.JLabel lblEndTimer;
     private javax.swing.JLabel lblNowPlaying;
+    private javax.swing.JLabel lblStartTimer;
     private javax.swing.JPanel mainPanel;
+    private javax.swing.JMenu menuAddToPlaylist;
     private javax.swing.JMenuItem menuItemAddSong;
     private javax.swing.JMenuItem menuItemAddToLibrary;
     private javax.swing.JMenuItem menuItemDeleteFromLibrary;
@@ -762,19 +957,28 @@ public class PlayerUI extends javax.swing.JFrame {
     private javax.swing.JMenuItem menuItemOpen;
     private javax.swing.JMenuItem menuItemOpenInNewWindow;
     private javax.swing.JMenuItem miCreatePlaylist;
+    private javax.swing.JMenuItem miDecreaseVolume;
+    private javax.swing.JMenuItem miIncreaseVolume;
+    private javax.swing.JMenuItem miNext;
+    private javax.swing.JMenuItem miPlay;
+    private javax.swing.JMenuItem miPrevious;
+    private javax.swing.JCheckBoxMenuItem miRepeat;
+    private javax.swing.JCheckBoxMenuItem miShuffle;
     private javax.swing.JPopupMenu popUpPlaylistTree;
     private javax.swing.JTable tableLibrary;
     private javax.swing.JPopupMenu tablePopupMenu;
     private javax.swing.JScrollPane tableScorllPan;
     private javax.swing.JTree treePlayList;
+    private javax.swing.JSlider volumeSlider;
     // End of variables declaration//GEN-END:variables
 
     private void initSongLibrary() {
-
+        currentShowingPlaylist = "library";
         List<Object[]> songs = songsLibraryDao.getAllSongs();
         for (Object[] song : songs) {
             //{songId,title,artist,album,length,genre,filePath,year,comment};
-            Object[] rowdata = {song[0], song[1], song[2], song[3], song[4], song[5], song[7], song[6], song[7]};
+            //songId, title, artist, album, songLength, genre, songYear, comments, songPath
+            Object[] rowdata = {song[0], song[1], song[2], song[3], song[4], song[5], song[8], song[6], song[7]};
             model.addRow(rowdata);
         }
 
@@ -789,15 +993,10 @@ public class PlayerUI extends javax.swing.JFrame {
     private void addRowToLibraryTable(File songFile) {
         try {
             String filePath = songFile.getAbsolutePath();
-            //System.out.println(filePath);
+            System.out.println(filePath);
             Mp3File mp3File = new Mp3File(filePath);
             ID3v1 tags = mp3File.getId3v1Tag();
-            final Song song = new Song();
-            // set song bytes 
-            FileInputStream fis = new FileInputStream(songFile);
-            byte[] songData = IOUtils.toByteArray(fis, fis.available());
-            song.setSong(songData);
-            //end of song bytes
+            Song song = new Song();
             song.setTitle(tags.getTitle());
             song.setAlbum(tags.getAlbum());
             song.setArtist(tags.getArtist());
@@ -805,40 +1004,33 @@ public class PlayerUI extends javax.swing.JFrame {
             song.setSongYear(tags.getYear());
             song.setComments(tags.getComment());
             song.setSongPath(filePath);
-            song.setSongLength(DurationFormatUtils.formatDurationHMS(mp3File.getLengthInMilliseconds()));
-            //int songId = songsLibraryDao.addSong(song);  
+            //song.setSongLength(DurationFormatUtils.formatDurationHMS(mp3File.getLengthInMilliseconds()));
+            song.setSongLength(String.valueOf(mp3File.getLengthInMilliseconds()));
+//int songId = songsLibraryDao.addSong(song);  
             //new thread to save song in the library 
             //String songPath= (String)tableLibrary.getValueAt(selectedRow, 6);
             if (songsLibraryDao.isAlreadyExist(filePath)) {
                 int songId = songsLibraryDao.getSongUsingFilePath(filePath);
-                
-                if (playListFlag || !currentShowingPlaylist.equals("library")) {
-                    addRowToLibraryTable(0, tags.getTitle(), tags.getArtist(), tags.getAlbum(), String.valueOf(mp3File.getLength()), String.valueOf(tags.getGenreDescription()), filePath, tags.getYear(), tags.getComment());
+
+                if (playListFlag) {
+
+                    addRowToLibraryTable(songId, tags.getTitle(), tags.getArtist(), tags.getAlbum(), String.valueOf(mp3File.getLengthInMilliseconds()), String.valueOf(tags.getGenreDescription()), filePath, tags.getYear(), tags.getComment());
                     playlistDao.addSongToPlaylist(currentShowingPlaylist, songId);
+
                 } else {
-                    JOptionPane.showMessageDialog(rootPane, "Song Already exist "+filePath);
+                    JOptionPane.showMessageDialog(rootPane, "Song Already exist " + filePath);
                 }
             } else {
-                addRowToLibraryTable(0, tags.getTitle(), tags.getArtist(), tags.getAlbum(), String.valueOf(mp3File.getLength()), String.valueOf(tags.getGenreDescription()), filePath, tags.getYear(), tags.getComment());
-
-                Thread t = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-
-                        int songId = songsLibraryDao.addSong(song);
-                        if (playListFlag || !currentShowingPlaylist.equals("library")) {
-                            playlistDao.addSongToPlaylist(currentShowingPlaylist, songId);
-                        }
-                        //JOptionPane.showMessageDialog(rootPane, "Saved " + songId);
+                int songId = songsLibraryDao.addSong(song);
+                addRowToLibraryTable(songId, tags.getTitle(), tags.getArtist(), tags.getAlbum(), String.valueOf(mp3File.getLengthInMilliseconds()), String.valueOf(tags.getGenreDescription()), filePath, tags.getYear(), tags.getComment());
+                if (playListFlag) {
+                    if (!currentShowingPlaylist.equals("library")) {
+                        playlistDao.addSongToPlaylist(currentShowingPlaylist, songId);
                     }
-                });
-                t.start();
-                t.join();
-            }
+                }
 
-            // end of thread to save song to database
-            // tableLibrary.setRowSelectionInterval(tableLibrary.getRowCount()-1, tableLibrary.getRowCount()-1);
-        } catch (IOException | UnsupportedTagException | InvalidDataException | InterruptedException ex) {
+            }
+        } catch (IOException | UnsupportedTagException | InvalidDataException ex) {
             Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
         }
 
@@ -869,8 +1061,8 @@ public class PlayerUI extends javax.swing.JFrame {
         colmn = tableLibrary.getColumnModel().getColumn(1);
         colmn.setPreferredWidth(150);
         colmn = tableLibrary.getColumnModel().getColumn(6);
-        colmn.setMinWidth(0);
-        colmn.setMaxWidth(0);
+        //colmn.setMinWidth(0);
+        //colmn.setMaxWidth(0);
 
         tableLibrary.setDropTarget(new DropTarget() {
             @Override
@@ -916,42 +1108,24 @@ public class PlayerUI extends javax.swing.JFrame {
 
             File firstSongFile = (File) fileList.get(0);
 
-          /*  try ( //Play mp3 file here
-               FileInputStream fis = new FileInputStream(firstSongFile)) {
-                myPlayerV1.stopPlaying();
-                myPlayerV1.playSong(IOUtils.toByteArray(fis));
+            /*  try ( //Play mp3 file here
+             FileInputStream fis = new FileInputStream(firstSongFile)) {
+             myPlayerV1.stopPlaying();
+             myPlayerV1.playSong(IOUtils.toByteArray(fis));
 
-                fis.close();
-                //super.drop(dtde);
-            }*/
+             fis.close();
+             //super.drop(dtde);
+             }*/
         } catch (UnsupportedFlavorException | IOException ex) {
             Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
-        } 
+        }
 
     }
 
     private void handleTableDoubleClick(int selectedSongId) {
-        if (selectedSongId == 0) {
-
-            File songFile = new File((String) tableLibrary.getValueAt(selectedRow, 6));
-            lblNowPlaying.setText((String) tableLibrary.getValueAt(selectedRow, 1));
-            try {
-                FileInputStream fis = new FileInputStream(songFile);
-                myPlayerV1.stopPlaying();
-                myPlayerV1.playSong(IOUtils.toByteArray(fis));
-            } catch (FileNotFoundException ex) {
-                Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (IOException ex) {
-                Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
-            }
-
-        } else {
-            //Retrive Song from database and then play 
-            lblNowPlaying.setText((String) tableLibrary.getValueAt(selectedRow, 1));
-            Song song = songsLibraryDao.getSong((int) tableLibrary.getValueAt(selectedRow, 0));
-            myPlayerV1.stopPlaying();
-            myPlayerV1.playSong(song.getSong());
-        }
+        File songFile = new File((String) tableLibrary.getValueAt(selectedRow, 6));
+        lblNowPlaying.setText((String) tableLibrary.getValueAt(selectedRow, 1));
+        myPlayerV2.play(songFile.getAbsolutePath());
     }
 
     private void addSongToLibraryFromFileSystem() {
@@ -960,7 +1134,7 @@ public class PlayerUI extends javax.swing.JFrame {
         fileChooser.addChoosableFileFilter(fileFilter);
         int returnVal = fileChooser.showOpenDialog(null);
         if (returnVal == JFileChooser.APPROVE_OPTION) {
-            myPlayerV1.stopPlaying();
+            //myPlayerV1.stopPlaying();
             final File songFile = fileChooser.getSelectedFile();
 
             FileInputStream fis;
@@ -977,14 +1151,7 @@ public class PlayerUI extends javax.swing.JFrame {
 
             int rowCount = tableLibrary.getRowCount();
             selectedRow = rowCount;
-            new Thread(new Runnable() {
-
-                @Override
-                public void run() {
-                    addRowToLibraryTable(songFile);
-                }
-            }).start();
-
+            addRowToLibraryTable(songFile);
             //addSongToLibrary();
         }
     }
@@ -1000,23 +1167,123 @@ public class PlayerUI extends javax.swing.JFrame {
     }
 
     private void showPlaylist(Playlist playList) {
-
+        currentShowingPlaylist = playList.getPlaylistName();
         ArrayList<Integer> songList = playList.getSongList();
         clearTable(tableLibrary);
         for (int i : songList) {
             Song song = songsLibraryDao.getSong(i);
-            addRowToLibraryTable(song.getSongId(), song.getTitle(), song.getArtist(), song.getAlbum(), song.getSongLength(), song.getGenre(), "", song.getSongYear(), song.getComments());
+            if (song != null) {
+                addRowToLibraryTable(song.getSongId(), song.getTitle(), song.getArtist(), song.getAlbum(), song.getSongLength(), song.getGenre(), song.getSongPath(), song.getSongYear(), song.getComments());
+            }
         }
     }
-    
+
     private void deleteSelectedNode() {
-    DefaultMutableTreeNode node;
-    DefaultTreeModel myModel = (DefaultTreeModel) (treePlayList.getModel());
-    TreePath[] paths = treePlayList.getSelectionPaths();
+        DefaultMutableTreeNode node;
+        DefaultTreeModel myModel = (DefaultTreeModel) (treePlayList.getModel());
+        TreePath[] paths = treePlayList.getSelectionPaths();
         for (TreePath path : paths) {
             node = (DefaultMutableTreeNode) (path.getLastPathComponent());
             myModel.removeNodeFromParent(node);
         }
-  }
+    }
+
+    private void playNext() {
+         int rowCount = tableLibrary.getRowCount() - 1;
+
+        if (selectedRow < rowCount) {
+            ++selectedRow;
+            handleTableDoubleClick((int) tableLibrary.getValueAt(selectedRow, 0));
+            currentSongIndex = selectedRow;
+        } else {
+            selectedRow = 0;
+            handleTableDoubleClick((int) tableLibrary.getValueAt(selectedRow, 0));
+            currentSongIndex = selectedRow;
+        }
+        tableLibrary.setRowSelectionInterval(selectedRow, selectedRow);
+    }
+
+    private void playPrevious() {
+        int rowCount = tableLibrary.getRowCount() - 1;
+
+        if (selectedRow > 0) {
+            --selectedRow;
+            handleTableDoubleClick((int) tableLibrary.getValueAt(selectedRow, 0));
+            currentSongIndex = selectedRow;
+        } else {
+            selectedRow = rowCount;
+            handleTableDoubleClick((int) tableLibrary.getValueAt(selectedRow, 0));
+            currentSongIndex = selectedRow;
+        }
+
+        tableLibrary.setRowSelectionInterval(selectedRow, selectedRow);
+    }
+    
+    
+    private void setCurrentSong(){
+        selectedRow = tableLibrary.getSelectedRow();  
+        currentSongIndex = selectedRow;
+    }
+    
+    
+
+    //////slider class
+    private class UpdateWorker extends SwingWorker<Void, Integer> {
+
+        private int duration;
+        
+        public void setDuration(int duration){
+            this.duration = duration;
+        }
+        
+        public UpdateWorker(){
+            this.duration = 0;
+        }
+
+        public UpdateWorker(int duration) {
+            this.duration = duration;
+        }
+
+        @Override
+        protected Void doInBackground() throws Exception {
+            for (int i = 0; i <= duration; i++) {
+        if (!paused) {
+            publish(i);
+            try {
+                Thread.sleep(1000);
+            } catch(InterruptedException e) {
+                //e.printStackTrace();
+            }
+        }
+        while (paused) {
+            try {
+                Thread.sleep(50);
+                continue;
+            } catch(InterruptedException e) {
+                //e.printStackTrace();
+            }
+        }
+    }
+    return null;
+        }
+
+        @Override
+        protected void process(List<Integer> chunks) {
+            progressBar.setValue(chunks.get(0));
+            lblStartTimer.setText(DurationFormatUtils.formatDuration(chunks.get(0)*1000, "H:mm:ss"));
+            lblEndTimer.setText(DurationFormatUtils.formatDuration((duration-chunks.get(0))*1000, "H:mm:ss"));
+            if(chunks.get(0)>=duration)
+                done();
+        }
+        
+        @Override
+        protected void done(){
+            setCursor(null);
+            duration = 0;
+            lblEndTimer.setText("0:00:00");
+            lblStartTimer.setText("0:00:00");
+        }
+
+    }
 
 }

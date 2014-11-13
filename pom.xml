@@ -145,17 +145,84 @@
         </dependency>
         <!-- Mp3SPI library -->
         <dependency>
-            <groupId>com.googlecode.soundlibs</groupId>
-            <artifactId>mp3spi</artifactId>
-            <version>1.9.5-1</version>
+            <groupId>music-gui</groupId>
+            <artifactId>music-gui</artifactId>
+            <version>3.0</version>
         </dependency>
         
         <dependency>
-            <groupId>com.googlecode.soundlibs</groupId>
-            <artifactId>tritonus-share</artifactId>
-            <version>0.3.7-1</version>
+            <groupId>basic-player</groupId>
+            <artifactId>basic-player</artifactId>
+            <version>3.0</version>
         </dependency>
-
+        
+        <dependency>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+            <version>3.0</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>jflac</groupId>
+            <artifactId>jflac</artifactId>
+            <version>1.2</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>jl</groupId>
+            <artifactId>jl</artifactId>
+            <version>1.0</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>jmac</groupId>
+            <artifactId>jmac</artifactId>
+            <version>4.0</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>jogg</groupId>
+            <artifactId>jogg</artifactId>
+            <version>0.0.7</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>jorbis</groupId>
+            <artifactId>jorbis</artifactId>
+            <version>1.0</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>jspeex</groupId>
+            <artifactId>jspeex</artifactId>
+            <version>1.0</version>
+        </dependency>
+        
+        
+        <dependency>
+            <groupId>kjdsp</groupId>
+            <artifactId>kjdsp</artifactId>
+            <version>1.0</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>mp3spi</groupId>
+            <artifactId>mp3spi</artifactId>
+            <version>1.9.4</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>tritonous</groupId>
+            <artifactId>tritonous</artifactId>
+            <version>1.0</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>vorbiss</groupId>
+            <artifactId>vorbiss</artifactId>
+            <version>1.0</version>
+        </dependency>
+        
 <!--        <dependency>
             <groupId>com.googlecode.soundlibs</groupId>
             <artifactId>jlayer</artifactId>
@@ -179,17 +246,7 @@
         </dependency>
 
         <!-- Local jars-->
-        <dependency>
-            <groupId>basic-player</groupId>
-            <artifactId>basic-player</artifactId>
-            <version>3.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>jl-one</groupId>
-            <artifactId>jl-one</artifactId>
-            <version>1.0</version>
-        </dependency>
+        
         
     </dependencies>
 </project>

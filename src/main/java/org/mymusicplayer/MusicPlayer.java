@@ -16,9 +16,9 @@ public class MusicPlayer {
     
     public static void main(String[] args){
     
-        //new PlayerUI(true).setVisible(true);
+        //new PlayerUI(true,"").setVisible(true);
         
         new PlayerUI(false,"library").setVisible(true);
-       
+     
     }
 }

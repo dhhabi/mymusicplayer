@@ -33,12 +33,8 @@ public class SongLibraryService {
     FileInputStream fis;
     
     public int addSong(String songFilePath){
-        File songFile = new File(songFilePath);
         Song song = new Song();
         try {
-            fis = new FileInputStream(songFile);
-            byte[] songData = IOUtils.toByteArray(fis,fis.available());
-            song.setSong(songData);
             Mp3File mp3File = new Mp3File(songFilePath);
             ID3v1 tags = mp3File.getId3v1Tag();
             song.setTitle(tags.getTitle());
@@ -47,6 +43,7 @@ public class SongLibraryService {
             song.setGenre(tags.getGenreDescription());
             String songLength = DurationFormatUtils.formatDurationHMS(mp3File.getLengthInMilliseconds());
             song.setSongLength(songLength);
+            song.setSongPath(songFilePath);
             
         } catch (FileNotFoundException ex) {
             JOptionPane.showMessageDialog(null, ex.toString());

@@ -65,20 +65,6 @@ public class Song implements Serializable {
         this.comments = comments;
     }
        
-    @Lob
-    @Column(length = 10485760)
-    private byte[] song;
-
-    public byte[] getSong() {
-        return song;
-    }
-
-    public void setSong(byte[] song) {
-        this.song = song;
-    }
-    
-    
-
     public String getArtist() {
         return artist;
     }
