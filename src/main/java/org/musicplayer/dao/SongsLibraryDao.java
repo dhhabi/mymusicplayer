@@ -52,7 +52,7 @@ public class SongsLibraryDao {
         
         Session session = sessionFactory.getCurrentSession();
         session.beginTransaction();
-        Query query = session.createQuery("select songId, title, artist, album, songLength, genre, songYear, comments, songPath from Song");
+        Query query = session.createQuery("select songId, title, artist, album, songLength, genre, songYear, comments, songPath from Song ORDER BY title");
         List<Object[]> songList = (List<Object[]>)query.list();
         session.getTransaction().commit();
         return songList;
@@ -98,5 +98,6 @@ public class SongsLibraryDao {
         }
         return songId;
      }
+    
     
 }

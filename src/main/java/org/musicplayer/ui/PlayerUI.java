@@ -20,6 +20,9 @@ import java.awt.dnd.DropTarget;
 import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.io.File;
@@ -27,31 +30,49 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.sound.sampled.AudioFileFormat;
+import javax.sound.sampled.UnsupportedAudioFileException;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFileChooser;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JProgressBar;
 import javax.swing.JSlider;
 import javax.swing.JTable;
+import javax.swing.RowSorter;
+import javax.swing.SortOrder;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.Timer;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
+import javax.swing.table.TableModel;
+import javax.swing.table.TableRowSorter;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.TreePath;
 import javazoom.jlgui.basicplayer.BasicPlayer;
+import javazoom.spi.mpeg.sampled.file.MpegAudioFileReader;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.time.DurationFormatUtils;
 import org.musicplayer.dao.PlayListDao;
+import org.musicplayer.dao.PlayerStateDao;
+import org.musicplayer.dao.RecentSongsDao;
 import org.musicplayer.dao.SongsLibraryDao;
+import org.musicplayer.model.PlayerState;
 import org.musicplayer.model.Playlist;
+import org.musicplayer.model.RecentSongs;
 import org.musicplayer.model.Song;
 import org.mymusicplayer.MusicPlayerV2;
 import org.mymusicplayer.MyPlayerV1;
@@ -70,8 +91,10 @@ public class PlayerUI extends javax.swing.JFrame {
     //public static MyPlayerV1 myPlayerV1 = new MyPlayerV1();
     public static MusicPlayerV2 myPlayerV2 = new MusicPlayerV2();
     public static int loop;
-    private final DefaultTableModel model = new DefaultTableModel(new String[]{"Id", "Title", "Artist", "Album", "Length", "Genre", "File Path", "Year", "Comments"}, 0);
-    private TableColumn colmn;
+    private final String[] tableColumns = new String[]{"Id", "Title", "Artist", "Album", "Length", "Genre", "File Path", "Year", "Comments"};
+    public DefaultTableModel model = new DefaultTableModel(tableColumns, 0);
+
+    public static TableColumn colmn;
     private int selectedRow = 0;
     private static boolean paused = false;
     public static BasicPlayer musicPlayer = new BasicPlayer();
@@ -79,6 +102,8 @@ public class PlayerUI extends javax.swing.JFrame {
     // private SongLibraryService libraryService = new SongLibraryService();
     private final SongsLibraryDao songsLibraryDao;
     private final PlayListDao playlistDao;
+    private final PlayerStateDao playerStateDao;
+    private final RecentSongsDao recentSongsDao;
     private final DefaultTreeModel treeModel;
     private String currentShowingPlaylist;
     private final String playListPassed;
@@ -91,18 +116,30 @@ public class PlayerUI extends javax.swing.JFrame {
     public static Timer timer = null;
     public static int timeCount = 0;
     public static JProgressBar progressBar;
-    private UpdateWorker updateWorker = new UpdateWorker();
+    private static UpdateWorker updateWorker;
 
     public PlayerUI(boolean flag, String playListName) {
         initComponents();
+        //setUpTableColumns();
+        updateWorker = new UpdateWorker();
         PlayerUI.progressBar = jProgressBar;
         treePlayList.setSelectionRow(0);
         this.currentShowingPlaylist = playListName;
         this.playlistDao = new PlayListDao();
         this.songsLibraryDao = new SongsLibraryDao();
+        this.playerStateDao = new PlayerStateDao();
+        this.recentSongsDao = new RecentSongsDao();
+
+        //temp
+        //playerStateDao.savePlayerState(new PlayerState());
+        //end temp
         this.treeModel = new DefaultTreeModel(rootNode);
         this.playListPassed = playListName;
-
+        ///////
+        tableLibrary.setAutoCreateRowSorter(true);
+        addMouseListenrToTableHeader();
+        initPopUpTableHeader();
+        /////
         initPlayListTree();
         treePlayList.setModel(treeModel);
         //custome
@@ -175,6 +212,7 @@ public class PlayerUI extends javax.swing.JFrame {
         popUpPlaylistTree = new javax.swing.JPopupMenu();
         menuItemOpenInNewWindow = new javax.swing.JMenuItem();
         menuItemDeletePlaylist = new javax.swing.JMenuItem();
+        popUpTableHeader = new javax.swing.JPopupMenu();
         lblNowPlaying = new javax.swing.JLabel();
         jLabel1 = new javax.swing.JLabel();
         cmdPlay = new javax.swing.JButton();
@@ -205,11 +243,12 @@ public class PlayerUI extends javax.swing.JFrame {
         miPlay = new javax.swing.JMenuItem();
         miNext = new javax.swing.JMenuItem();
         miPrevious = new javax.swing.JMenuItem();
-        jMenu2 = new javax.swing.JMenu();
+        miPlayRecent = new javax.swing.JMenu();
         jMenuItem3 = new javax.swing.JMenuItem();
         jSeparator1 = new javax.swing.JPopupMenu.Separator();
         miIncreaseVolume = new javax.swing.JMenuItem();
         miDecreaseVolume = new javax.swing.JMenuItem();
+        jSeparator2 = new javax.swing.JPopupMenu.Separator();
         miShuffle = new javax.swing.JCheckBoxMenuItem();
         miRepeat = new javax.swing.JCheckBoxMenuItem();
 
@@ -364,6 +403,7 @@ public class PlayerUI extends javax.swing.JFrame {
             }
         ));
         tableLibrary.setComponentPopupMenu(tablePopupMenu);
+        tableLibrary.setDragEnabled(true);
         tableLibrary.setFocusable(false);
         tableLibrary.setShowVerticalLines(false);
         tableLibrary.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -472,8 +512,13 @@ public class PlayerUI extends javax.swing.JFrame {
         });
         jMenu1.add(miPrevious);
 
-        jMenu2.setText("Play Recent");
-        jMenu1.add(jMenu2);
+        miPlayRecent.setText("Play Recent");
+        miPlayRecent.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseEntered(java.awt.event.MouseEvent evt) {
+                miPlayRecentMouseEntered(evt);
+            }
+        });
+        jMenu1.add(miPlayRecent);
 
         jMenuItem3.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_L, java.awt.event.InputEvent.CTRL_MASK));
         jMenuItem3.setText("Go to  Current Song");
@@ -504,6 +549,7 @@ public class PlayerUI extends javax.swing.JFrame {
             }
         });
         jMenu1.add(miDecreaseVolume);
+        jMenu1.add(jSeparator2);
 
         miShuffle.setSelected(true);
         miShuffle.setText("Shuffle");
@@ -605,6 +651,8 @@ public class PlayerUI extends javax.swing.JFrame {
 
         //myPlayer.stop();
         myPlayerV2.stop();
+        updateWorker.done();
+
 
     }//GEN-LAST:event_cmdStopActionPerformed
 
@@ -615,17 +663,12 @@ public class PlayerUI extends javax.swing.JFrame {
             paused = false;
         } else {
             myPlayerV2.stop();
-            myPlayerV2.play((String) tableLibrary.getValueAt(selectedRow, 6));
+            playSong((String) tableLibrary.getValueAt(selectedRow, 6));
+
             currentSongIndex = selectedRow;
             jProgressBar.setMinimum(0);
-            int duration = Integer.parseInt((String)tableLibrary.getValueAt(selectedRow, 4))/1000;
-            jProgressBar.setMaximum(duration);
-            jProgressBar.setValue(0);
-            
-            updateWorker.done();
-            updateWorker = new UpdateWorker(duration);
-            updateWorker.execute();
-            
+            //int duration = Integer.parseInt((String) tableLibrary.getValueAt(selectedRow, 4)) / 1000;
+
         }
     }//GEN-LAST:event_cmdPlayActionPerformed
 
@@ -672,7 +715,8 @@ public class PlayerUI extends javax.swing.JFrame {
             File songFile = fileChooser.getSelectedFile();
             //FileInputStream fis;
             //fis = new FileInputStream(songFile);
-            myPlayerV2.play(songFile.getAbsolutePath());
+            myPlayerV2.stop();
+            playSong(songFile.getAbsolutePath());
             lblNowPlaying.setText(songFile.getName());
             //  fis.close();
 
@@ -704,7 +748,7 @@ public class PlayerUI extends javax.swing.JFrame {
     }//GEN-LAST:event_menuItemDeleteFromLibraryActionPerformed
 
     private void cmdNextActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmdNextActionPerformed
-       playNext();
+        playNext();
     }//GEN-LAST:event_cmdNextActionPerformed
 
     private void cmdPreviousActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_cmdPreviousActionPerformed
@@ -716,18 +760,6 @@ public class PlayerUI extends javax.swing.JFrame {
     }//GEN-LAST:event_menuItemAddSongActionPerformed
 
     private void jMenuItem2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItem2ActionPerformed
-        int songId = (int) tableLibrary.getValueAt(selectedRow, 0);
-        if (songId == 0) {
-            JOptionPane.showMessageDialog(rootPane, "Song not added to library yet");
-
-        } else {
-            int deletedRows = songsLibraryDao.deleteSong(songId);
-            if (deletedRows > 0) {
-                DefaultTableModel tableModel = (DefaultTableModel) tableLibrary.getModel();
-                tableModel.removeRow(selectedRow);
-                JOptionPane.showMessageDialog(rootPane, "Song deleted successfully");
-            }
-        }
 
     }//GEN-LAST:event_jMenuItem2ActionPerformed
 
@@ -849,7 +881,8 @@ public class PlayerUI extends javax.swing.JFrame {
 
     private void miPlayActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miPlayActionPerformed
         //JOptionPane.showMessageDialog(rootPane, selectedRow);
-        myPlayerV2.play((String) tableLibrary.getValueAt(selectedRow, 6));
+        myPlayerV2.stop();
+        playSong((String) tableLibrary.getValueAt(selectedRow, 6));
         tableLibrary.setRowSelectionInterval(selectedRow, selectedRow);
     }//GEN-LAST:event_miPlayActionPerformed
 
@@ -866,28 +899,47 @@ public class PlayerUI extends javax.swing.JFrame {
     }//GEN-LAST:event_jMenuItem3ActionPerformed
 
     private void miIncreaseVolumeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miIncreaseVolumeActionPerformed
-        if(volumeSlider.getValue()<80)
+        if (volumeSlider.getValue() < 80) {
             volumeSlider.getModel().setValue(volumeSlider.getValue() + 20);
-        else
+        } else {
             volumeSlider.getModel().setValue(100);
+        }
         //JOptionPane.showMessageDialog(rootPane, volumeSlider.getValue());
         //volumeSlider.repaint();
     }//GEN-LAST:event_miIncreaseVolumeActionPerformed
 
     private void miDecreaseVolumeActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miDecreaseVolumeActionPerformed
-        if(volumeSlider.getValue()>20)
+        if (volumeSlider.getValue() > 20) {
             volumeSlider.getModel().setValue(volumeSlider.getValue() - 20);
-        else
+        } else {
             volumeSlider.getModel().setValue(0);
+        }
     }//GEN-LAST:event_miDecreaseVolumeActionPerformed
 
     private void miShuffleActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miShuffleActionPerformed
-       shuffle = miShuffle.isSelected();
+        shuffle = miShuffle.isSelected();
     }//GEN-LAST:event_miShuffleActionPerformed
 
     private void miRepeatActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_miRepeatActionPerformed
         repeat = miRepeat.isSelected();
     }//GEN-LAST:event_miRepeatActionPerformed
+
+    private void miPlayRecentMouseEntered(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_miPlayRecentMouseEntered
+        miPlayRecent.removeAll();
+        List<String> recentSongList = recentSongsDao.getRecentSongs().getRecentSongList();
+        for (String recentSong : recentSongList) {
+            JMenuItem menuItem = new JMenuItem(recentSong);
+            miPlayRecent.add(menuItem);
+            menuItem.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    playSong(e.getActionCommand());
+                }
+            });
+        }
+
+
+    }//GEN-LAST:event_miPlayRecentMouseEntered
 
     /**
      * @param args the command line arguments
@@ -934,7 +986,6 @@ public class PlayerUI extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JMenu jMenu1;
-    private javax.swing.JMenu jMenu2;
     private javax.swing.JMenuBar jMenuBar1;
     private javax.swing.JMenuItem jMenuItem1;
     private javax.swing.JMenuItem jMenuItem2;
@@ -943,6 +994,7 @@ public class PlayerUI extends javax.swing.JFrame {
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JPopupMenu.Separator jSeparator1;
+    private javax.swing.JPopupMenu.Separator jSeparator2;
     private javax.swing.JTree jTree1;
     private javax.swing.JLabel lblEndTimer;
     private javax.swing.JLabel lblNowPlaying;
@@ -961,10 +1013,12 @@ public class PlayerUI extends javax.swing.JFrame {
     private javax.swing.JMenuItem miIncreaseVolume;
     private javax.swing.JMenuItem miNext;
     private javax.swing.JMenuItem miPlay;
+    private javax.swing.JMenu miPlayRecent;
     private javax.swing.JMenuItem miPrevious;
     private javax.swing.JCheckBoxMenuItem miRepeat;
     private javax.swing.JCheckBoxMenuItem miShuffle;
     private javax.swing.JPopupMenu popUpPlaylistTree;
+    private javax.swing.JPopupMenu popUpTableHeader;
     private javax.swing.JTable tableLibrary;
     private javax.swing.JPopupMenu tablePopupMenu;
     private javax.swing.JScrollPane tableScorllPan;
@@ -1046,23 +1100,48 @@ public class PlayerUI extends javax.swing.JFrame {
     }
 
     private void initTable() {
-
-        //model = new DefaultTableModel();
-        //scroll = new JScrollPane(tableLibrary);
+        //"Id", "Title", "Artist", "Album", "Length", "Genre", "File Path", "Year", "Comments"
         tableLibrary.setModel(model);
-
         colmn = tableLibrary.getColumnModel().getColumn(0);
-        colmn.setMinWidth(0);
-        colmn.setMaxWidth(0);
-        //hide lenght column
-        colmn = tableLibrary.getColumnModel().getColumn(3);
-        colmn.setMinWidth(0);
-        colmn.setMaxWidth(0);
+        HashSet<String> columnList = playerStateDao.getPlayerState().getColumnList();
+        if (!columnList.contains("Id")) {
+            colmn.setMinWidth(0);
+            colmn.setMaxWidth(0);
+        }
         colmn = tableLibrary.getColumnModel().getColumn(1);
         colmn.setPreferredWidth(150);
+        colmn = tableLibrary.getColumnModel().getColumn(2);
+        if (!columnList.contains("Artist")) {
+            colmn.setMinWidth(0);
+            colmn.setMaxWidth(0);
+        }
+        colmn = tableLibrary.getColumnModel().getColumn(3);
+        if (!columnList.contains("Album")) {
+            colmn.setMinWidth(0);
+            colmn.setMaxWidth(0);
+        }
+        colmn = tableLibrary.getColumnModel().getColumn(4);
+        colmn.setMinWidth(0);
+        colmn.setMaxWidth(0);
+
+        colmn = tableLibrary.getColumnModel().getColumn(5);
+        if (!columnList.contains("Genre")) {
+            colmn.setMinWidth(0);
+            colmn.setMaxWidth(0);
+        }
         colmn = tableLibrary.getColumnModel().getColumn(6);
-        //colmn.setMinWidth(0);
-        //colmn.setMaxWidth(0);
+        colmn.setMinWidth(0);
+        colmn.setMaxWidth(0);
+        colmn = tableLibrary.getColumnModel().getColumn(7);
+        if (!columnList.contains("Year")) {
+            colmn.setMinWidth(0);
+            colmn.setMaxWidth(0);
+        }
+        colmn = tableLibrary.getColumnModel().getColumn(8);
+        if (!columnList.contains("Comments")) {
+            colmn.setMinWidth(0);
+            colmn.setMaxWidth(0);
+        }
 
         tableLibrary.setDropTarget(new DropTarget() {
             @Override
@@ -1086,38 +1165,59 @@ public class PlayerUI extends javax.swing.JFrame {
     }
 
     private void handleDropedFile(DropTargetDropEvent dtde) {
-
-        try {
+        dtde.acceptDrop(DnDConstants.ACTION_LINK);
+        Transferable t = dtde.getTransferable();
+        if (dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+            try {
             // handle drop outside current table
-            //JOptionPane.showMessageDialog(rootPane, "Outside");
-            dtde.acceptDrop(DnDConstants.ACTION_LINK);
-            Transferable t = dtde.getTransferable();
-            List fileList = (List) t.getTransferData(DataFlavor.javaFileListFlavor);
-            int rowCount = tableLibrary.getRowCount();
-            selectedRow = rowCount;
-            for (Object file : fileList) {
-                final File songFile = (File) file;
-                new Thread(new Runnable() {
+                //JOptionPane.showMessageDialog(rootPane, "Outside");
 
-                    @Override
-                    public void run() {
-                        addRowToLibraryTable(songFile);
-                    }
-                }).start();
+                List fileList = (List) t.getTransferData(DataFlavor.javaFileListFlavor);
+                int rowCount = tableLibrary.getRowCount();
+                selectedRow = rowCount;
+                for (Object file : fileList) {
+                    final File songFile = (File) file;
+                    new Thread(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            addRowToLibraryTable(songFile);
+                        }
+                    }).start();
+                }
+               // sortTable();
+            } catch (UnsupportedFlavorException | IOException ex) {
+                Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
             }
 
-            File firstSongFile = (File) fileList.get(0);
-
-            /*  try ( //Play mp3 file here
-             FileInputStream fis = new FileInputStream(firstSongFile)) {
-             myPlayerV1.stopPlaying();
-             myPlayerV1.playSong(IOUtils.toByteArray(fis));
-
-             fis.close();
-             //super.drop(dtde);
-             }*/
-        } catch (UnsupportedFlavorException | IOException ex) {
-            Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
+        } else {
+            //handle drop from library here 
+            String dataReceived;
+            try {
+                dataReceived = (String) t.getTransferData(DataFlavor.stringFlavor);
+                String[] rowData = dataReceived.split("\t");
+                System.out.println(rowData.length + "sizzzze");
+                String[] rowData1 = new String[9];
+                int index = 0;
+                for(String item:rowData){
+                    rowData1[index] = item;
+                    System.out.println(item);
+                    if(index<8){
+                       index++;
+                    }
+                    else{
+                       index=0;
+                       model.addRow(rowData1);
+                       if(!currentShowingPlaylist.equals("library")){
+                           playlistDao.addSongToPlaylist(currentShowingPlaylist, Integer.parseInt(rowData1[0]));
+                       }
+                    }
+                }
+                
+            } catch (UnsupportedFlavorException | IOException ex) {
+                Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
+            }					                //if(!playListPassed.equals("library")){
+            // System.out.println(rowData[2]+"fileepaaaaaaaaaath");
         }
 
     }
@@ -1125,7 +1225,7 @@ public class PlayerUI extends javax.swing.JFrame {
     private void handleTableDoubleClick(int selectedSongId) {
         File songFile = new File((String) tableLibrary.getValueAt(selectedRow, 6));
         lblNowPlaying.setText((String) tableLibrary.getValueAt(selectedRow, 1));
-        myPlayerV2.play(songFile.getAbsolutePath());
+        playSong(songFile.getAbsolutePath());
     }
 
     private void addSongToLibraryFromFileSystem() {
@@ -1176,6 +1276,7 @@ public class PlayerUI extends javax.swing.JFrame {
                 addRowToLibraryTable(song.getSongId(), song.getTitle(), song.getArtist(), song.getAlbum(), song.getSongLength(), song.getGenre(), song.getSongPath(), song.getSongYear(), song.getComments());
             }
         }
+        //sortTable();
     }
 
     private void deleteSelectedNode() {
@@ -1189,7 +1290,7 @@ public class PlayerUI extends javax.swing.JFrame {
     }
 
     private void playNext() {
-         int rowCount = tableLibrary.getRowCount() - 1;
+        int rowCount = tableLibrary.getRowCount() - 1;
 
         if (selectedRow < rowCount) {
             ++selectedRow;
@@ -1218,25 +1319,22 @@ public class PlayerUI extends javax.swing.JFrame {
 
         tableLibrary.setRowSelectionInterval(selectedRow, selectedRow);
     }
-    
-    
-    private void setCurrentSong(){
-        selectedRow = tableLibrary.getSelectedRow();  
+
+    private void setCurrentSong() {
+        selectedRow = tableLibrary.getSelectedRow();
         currentSongIndex = selectedRow;
     }
-    
-    
 
     //////slider class
     private class UpdateWorker extends SwingWorker<Void, Integer> {
 
         private int duration;
-        
-        public void setDuration(int duration){
+
+        public void setDuration(int duration) {
             this.duration = duration;
         }
-        
-        public UpdateWorker(){
+
+        public UpdateWorker() {
             this.duration = 0;
         }
 
@@ -1247,43 +1345,144 @@ public class PlayerUI extends javax.swing.JFrame {
         @Override
         protected Void doInBackground() throws Exception {
             for (int i = 0; i <= duration; i++) {
-        if (!paused) {
-            publish(i);
-            try {
-                Thread.sleep(1000);
-            } catch(InterruptedException e) {
-                //e.printStackTrace();
+                if (!paused) {
+                    publish(i);
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        //e.printStackTrace();
+                    }
+                }
+                while (paused) {
+                    try {
+                        Thread.sleep(50);
+                        continue;
+                    } catch (InterruptedException e) {
+                        //e.printStackTrace();
+                    }
+                }
             }
-        }
-        while (paused) {
-            try {
-                Thread.sleep(50);
-                continue;
-            } catch(InterruptedException e) {
-                //e.printStackTrace();
-            }
-        }
-    }
-    return null;
+            return null;
         }
 
         @Override
         protected void process(List<Integer> chunks) {
             progressBar.setValue(chunks.get(0));
-            lblStartTimer.setText(DurationFormatUtils.formatDuration(chunks.get(0)*1000, "H:mm:ss"));
-            lblEndTimer.setText(DurationFormatUtils.formatDuration((duration-chunks.get(0))*1000, "H:mm:ss"));
-            if(chunks.get(0)>=duration)
+            lblStartTimer.setText(DurationFormatUtils.formatDuration(chunks.get(0) * 1000, "H:mm:ss"));
+            lblEndTimer.setText(DurationFormatUtils.formatDuration((duration - chunks.get(0)) * 1000, "H:mm:ss"));
+            if (chunks.get(0) >= duration) {
                 done();
+            }
         }
-        
+
         @Override
-        protected void done(){
+        protected void done() {
             setCursor(null);
             duration = 0;
             lblEndTimer.setText("0:00:00");
             lblStartTimer.setText("0:00:00");
+            progressBar.setValue(0);
         }
 
     }
 
+    private void addMouseListenrToTableHeader() {
+
+        tableLibrary.getTableHeader().addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (SwingUtilities.isRightMouseButton(e)) {
+                    popUpTableHeader.show(tableLibrary.getTableHeader(), e.getX(), e.getY());
+                }
+
+            }
+        });
+    }
+
+    /**
+     * init the table header popup menu and impliments actions listener
+     */
+    private void initPopUpTableHeader() {
+        for (String columnName : tableColumns) {
+            if (!columnName.equals("Title")) {
+                if (!columnName.equals("File Path")) {
+                    if (!columnName.equals("Length")) {
+                        JCheckBoxMenuItem menuItem = new JCheckBoxMenuItem(columnName);
+                        HashSet<String> columnList = playerStateDao.getPlayerState().getColumnList();
+                        if (columnList.contains(columnName)) {
+                            menuItem.setSelected(true);
+                        }
+//add listener to popup menu button
+                        menuItem.addActionListener(new ActionListener() {
+                            @Override
+                            public void actionPerformed(ActionEvent e) {
+                                JOptionPane.showMessageDialog(rootPane, e.getActionCommand());
+                                JCheckBoxMenuItem menuClicked = (JCheckBoxMenuItem) e.getSource();
+                                TableColumn column = tableLibrary.getColumn(e.getActionCommand());
+
+                                if (menuClicked.isSelected()) {
+                                    column.setMinWidth(100);
+                                    column.setMaxWidth(100);
+                                    column.setPreferredWidth(100);
+                                    playerStateDao.addTableColumn(e.getActionCommand());
+                                    //updateTableColumn();
+                                } else {
+                                    column.setMinWidth(0);
+                                    column.setMaxWidth(0);
+                                    playerStateDao.deleteTableColumn(e.getActionCommand());
+                                }
+
+                            }
+                        });
+                        popUpTableHeader.add(menuItem);
+                    }
+                }
+            }
+        }
+    }
+
+    private void setUpTableColumns() {
+        PlayerState playerState = playerStateDao.getPlayerState();
+        if (playerState == null) {
+            playerState = new PlayerState();
+            playerStateDao.savePlayerState(playerState);
+        }
+    }
+
+    private void playSong(String filePath) {
+        //myPlayerV2.stop();
+        myPlayerV2.play(filePath);
+        paused = false;
+        AudioFileFormat baseFileFormat;
+        try {
+            baseFileFormat = new MpegAudioFileReader().getAudioFileFormat(new File(filePath));
+            Map properties = baseFileFormat.properties();
+            Long longDuration = (Long) properties.get("duration");
+            Long longSec = longDuration / 1000000;
+            int intSec = longSec.intValue();
+            jProgressBar.setMaximum(intSec);
+            jProgressBar.setValue(0);
+            updateWorker.done();
+            updateWorker = new UpdateWorker(intSec);
+            updateWorker.execute();
+        } catch (UnsupportedAudioFileException | IOException ex) {
+            Logger.getLogger(PlayerUI.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+        //recentSongsDao.initRecentSong();
+        recentSongsDao.addRecentSong(filePath);
+
+    }
+
+    private void sortTable() {
+        TableRowSorter<TableModel> sorter = new TableRowSorter<>(tableLibrary.getModel());
+        tableLibrary.setRowSorter(sorter);
+        List<RowSorter.SortKey> sortKeys = new ArrayList<>();
+
+        int columnIndexToSort = 1;
+        sortKeys.add(new RowSorter.SortKey(columnIndexToSort, SortOrder.ASCENDING));
+
+        sorter.setSortKeys(sortKeys);
+        sorter.sort();
+    }
 }
